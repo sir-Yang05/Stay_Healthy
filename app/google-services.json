@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "34546709138",
+    "project_id": "stay-healthy-a793a",
+    "storage_bucket": "stay-healthy-a793a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34546709138:android:f378dbc4528118f43e2c4b",
+        "android_client_info": {
+          "package_name": "com.example.stay_healthy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9nD2_Cy_6Xj2Nupy3H_pRMLOBxnb0hS8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

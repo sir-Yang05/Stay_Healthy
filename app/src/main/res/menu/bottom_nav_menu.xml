@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/exercise"
+        android:icon="@drawable/ic_exercise"
+        android:title="Exercise" />
+
+    <item
+        android:id="@+id/mental"
+        android:icon="@drawable/ic_mental"
+        android:title="Mental Wellness" />
+
+    <item
+        android:id="@+id/dietary"
+        android:icon="@drawable/ic_dietary"
+        android:title="Dietary" />
+
+    <item
+        android:id="@+id/profile"
+        android:icon="@drawable/ic_profile"
+        android:title="Profile" />
+
+</menu>
