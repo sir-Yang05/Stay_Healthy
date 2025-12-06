@@ -36,5 +36,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:menu="@menu/bottom_nav_menu" />
 
+    <Button
+        android:id="@+id/logoutBtn"
+        android:layout_width="225dp"
+        android:layout_height="41dp"
+        android:text="Log out"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_editor_absoluteY="598dp" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

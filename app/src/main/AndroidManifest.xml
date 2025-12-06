@@ -19,22 +19,19 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyD2Pw8IPk8VQvPK5j6iXptgP_F8nd7zy48" />
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-        <activity android:name=".LoginActivity" />\n
-        <activity android:name=".RegisterActivity" />\n
-        <activity android:name=".z_AddJournalActivity" />\n
-        <activity android:name=".z_ProfileActivity" />\n
-        <activity android:name=".z_MapTrackActivity" />\n
-        <activity android:name=".z_CalorieEstimatorActivity" />\n
-        <activity android:name=".z_RecommendationsActivity" />\n
 
+        </activity>
+        <activity android:name=".MainPage" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".DietoryPage" android:exported="false" />
+        <activity android:name=".MentalWellnessPage" android:exported="false" />
+        <activity android:name=".Profile" android:exported="false" />
     </application>
 
 </manifest>

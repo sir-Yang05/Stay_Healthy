@@ -12,15 +12,14 @@
     <ImageView
         android:id="@+id/logo"
         android:layout_width="131dp"
-        android:layout_height="149dp"
+        android:layout_height="117dp"
         android:layout_marginTop="60dp"
         android:contentDescription="App Logo"
-        android:src="@drawable/Logo"
+        android:src="@drawable/stayhealthy"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 2. 用户名/账号输入框 (圆角 + 间隔) -->
     <EditText
         android:id="@+id/edit_username"
         android:layout_width="0dp"
@@ -101,17 +100,16 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="40dp"
             android:clickable="true"
-            android:drawableTop="@drawable/ic_register"
             android:drawablePadding="4dp"
             android:gravity="center_horizontal"
             android:text="Register"
+            android:id="@+id/text_register"
             android:textColor="@android:color/black" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:clickable="true"
-            android:drawableTop="@drawable/ic_other_login"
             android:drawablePadding="4dp"
             android:gravity="center_horizontal"
             android:text="Other Login"
