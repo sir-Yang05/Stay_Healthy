@@ -46,11 +46,11 @@ public class LoginActivity extends AppCompatActivity {
         textForgotPassword.setOnClickListener(v -> showPasswordRecoveryDialog());
 
         if (textRegister != null) {
-            textRegister.setOnClickListener(v -> navigateToRegister());
+            textRegister.setOnClickListener(v -> Register());
         }
     }
-    private void navigateToRegister() {
-        startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
+    private void Register(){
+        startActivity(new Intent(LoginActivity.this,RegisterActivity.class));
     }
     private void attemptLogin() {
         String email = editEmail.getText().toString().trim();

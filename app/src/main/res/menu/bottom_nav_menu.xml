@@ -9,7 +9,7 @@
     <item
         android:id="@+id/mental"
         android:icon="@drawable/ic_mental"
-        android:title="Mental Wellness" />
+        android:title="Mental" />
 
     <item
         android:id="@+id/dietary"

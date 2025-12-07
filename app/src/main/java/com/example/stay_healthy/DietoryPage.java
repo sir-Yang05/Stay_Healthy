@@ -2,9 +2,13 @@ package com.example.stay_healthy;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
+import android.view.MenuItem;
+
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.navigation.NavigationBarView;
 
 public class DietoryPage extends AppCompatActivity {
 
@@ -13,36 +17,30 @@ public class DietoryPage extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.dietory_page);
 
-        Button ExerciseButton = findViewById(R.id.exercise);
-        Button dietButton = findViewById(R.id.mental);
-        Button wellnessButton = findViewById(R.id.dietary);
-        Button profileButton = findViewById(R.id.profile);
+        BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
+        bottomNavigationView.setSelectedItemId(R.id.dietary);
 
-        ExerciseButton.setOnClickListener(new View.OnClickListener() {
+        bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
             @Override
-            public void onClick(View v) {
-                startActivity(new Intent(DietoryPage.this, MainPage.class));
-            }
-        });
-
-        dietButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(DietoryPage.this, DietoryPage.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-            }
-        });
-
-        wellnessButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(DietoryPage.this, MentalWellnessPage.class));
-            }
-        });
-
-        profileButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(DietoryPage.this, Profile.class));
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int itemId = item.getItemId();
+                if (itemId == R.id.exercise) {
+                    startActivity(new Intent(DietoryPage.this, MainPage.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                } else if (itemId == R.id.dietary) {
+                    startActivity(new Intent(DietoryPage.this, DietoryPage.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                    return true;
+                } else if (itemId == R.id.mental) {
+                    startActivity(new Intent(DietoryPage.this, MentalWellnessPage.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                } else if (itemId == R.id.profile) {
+                    startActivity(new Intent(DietoryPage.this, Profile.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                }
+                return false;
             }
         });
     }

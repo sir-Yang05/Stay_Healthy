@@ -2,9 +2,13 @@ package com.example.stay_healthy;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
+import android.view.MenuItem;
+
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.navigation.NavigationBarView;
 
 public class Profile extends AppCompatActivity {
 
@@ -13,37 +17,30 @@ public class Profile extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.profile_page);
 
-        Button ExerciseButton = findViewById(R.id.exercise);
-        Button dietButton = findViewById(R.id.mental);
-        Button wellnessButton = findViewById(R.id.dietary);
-        Button profileButton = findViewById(R.id.profile);
+        BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
+        bottomNavigationView.setSelectedItemId(R.id.profile);
 
-        ExerciseButton.setOnClickListener(new View.OnClickListener() {
+        bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
             @Override
-            public void onClick(View v) {
-                startActivity(new Intent(Profile.this, MainPage.class));
-            }
-        });
-
-        dietButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(Profile.this, DietoryPage.class));
-            }
-        });
-
-        wellnessButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(Profile.this, MentalWellnessPage.class));
-            }
-        });
-
-        profileButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // 当前页面，使用 REORDER_TO_FRONT 避免重复创建
-                startActivity(new Intent(Profile.this, Profile.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int itemId = item.getItemId();
+                if (itemId == R.id.exercise) {
+                    startActivity(new Intent(Profile.this, MainPage.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                } else if (itemId == R.id.dietary) {
+                    startActivity(new Intent(Profile.this, DietoryPage.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                } else if (itemId == R.id.mental) {
+                    startActivity(new Intent(Profile.this, MentalWellnessPage.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    return true;
+                } else if (itemId == R.id.profile) {
+                    startActivity(new Intent(Profile.this, Profile.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                    return true;
+                }
+                return false;
             }
         });
     }
