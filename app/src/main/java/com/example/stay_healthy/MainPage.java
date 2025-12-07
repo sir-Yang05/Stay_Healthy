@@ -34,7 +34,7 @@ public class MainPage extends AppCompatActivity {
                     overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                     return true;
                 } else if (itemId == R.id.profile) {
-                    startActivity(new Intent(MainPage.this, Profile.class));
+                    startActivity(new Intent(MainPage.this, ProfileActivity.class));
                     overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                     return true;
                 }

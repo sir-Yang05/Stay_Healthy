@@ -43,7 +43,8 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
     implementation("com.google.firebase:firebase-analytics")
-
+    implementation("com.google.firebase:firebase-database:20.3.1")
+    
     // AndroidX Libraries from libs.versions.toml
     implementation(libs.appcompat)
     implementation(libs.material)

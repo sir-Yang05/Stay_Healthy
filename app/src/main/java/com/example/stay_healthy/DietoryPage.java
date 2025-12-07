@@ -36,7 +36,7 @@ public class DietoryPage extends AppCompatActivity {
                     overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                     return true;
                 } else if (itemId == R.id.profile) {
-                    startActivity(new Intent(DietoryPage.this, Profile.class));
+                    startActivity(new Intent(DietoryPage.this, ProfileActivity.class));
                     overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                     return true;
                 }

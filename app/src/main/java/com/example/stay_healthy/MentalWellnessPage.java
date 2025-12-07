@@ -36,7 +36,7 @@ public class MentalWellnessPage extends AppCompatActivity {
                     startActivity(new Intent(MentalWellnessPage.this, MentalWellnessPage.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
                     return true;
                 } else if (itemId == R.id.profile) {
-                    startActivity(new Intent(MentalWellnessPage.this, Profile.class));
+                    startActivity(new Intent(MentalWellnessPage.this, ProfileActivity.class));
                     overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                     return true;
                 }
