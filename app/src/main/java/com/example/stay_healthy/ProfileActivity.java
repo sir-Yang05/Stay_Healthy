@@ -18,7 +18,7 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import android.util.Log;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -61,7 +61,7 @@ public class ProfileActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile);
 
         mAuth = FirebaseAuth.getInstance();
-        mDatabase = FirebaseDatabase.getInstance().getReference("Users");
+        mDatabase = FirebaseDatabase.getInstance("https://stay-healthy-ad450-default-rtdb.asia-southeast1.firebasedatabase.app").getReference("Users");
 
         profileImage = findViewById(R.id.profile_image);
         changePhotoText = findViewById(R.id.change_photo_text);
@@ -149,7 +149,7 @@ public class ProfileActivity extends AppCompatActivity {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), tempImageUri);
                 finalImageString = bitmapToString(bitmap);
             } catch (IOException e) {
-                pd.dismiss();
+                    pd.dismiss();
                 return;
             }
         } else {
@@ -164,6 +164,7 @@ public class ProfileActivity extends AppCompatActivity {
                 Toast.makeText(ProfileActivity.this, "Save Success!", Toast.LENGTH_SHORT).show();
                 currentImageBase64 = finalImageString;
             } else {
+                android.util.Log.e("ProfileSave", "Error: ", task.getException());
                 Toast.makeText(ProfileActivity.this, "Failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
@@ -175,10 +176,24 @@ public class ProfileActivity extends AppCompatActivity {
             mDatabase.child(user.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (isFinishing() || isDestroyed()) return;
+
                     User userProfile = snapshot.getValue(User.class);
                     if (userProfile != null) {
                         signatureEditText.setText(userProfile.signature);
                         birthdayText.setText(userProfile.birthday);
+                        if (userProfile.gender != null) {
+                            Log.d("GenderDebug", "The gender read from the database is: [" + userProfile.gender + "]");
+                            String genderStr = userProfile.gender.trim();
+
+                            if (userProfile.gender.equals("male")) {
+                                genderRadioGroup.check(R.id.radio_male);
+                            } else if (userProfile.gender.equals("female")) {
+                                genderRadioGroup.check(R.id.radio_female);
+                            } else if (userProfile.gender.equals("Do not show")){
+                                genderRadioGroup.check(R.id.radio_none);
+                            }
+                        }
 
                         if (userProfile.profileImageUrl != null && !userProfile.profileImageUrl.isEmpty()) {
                             currentImageBase64 = userProfile.profileImageUrl;

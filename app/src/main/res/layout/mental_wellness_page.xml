@@ -75,7 +75,7 @@
                         android:background="@drawable/emotion_background"
                         android:clickable="true"
                         android:focusable="true"
-                        android:id="@+id/mood_very_happy">
+                        android:id="@+id/mood_idk">
 
                         <ImageView
                             android:layout_width="50dp"
@@ -164,7 +164,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Feeling Down"
+                            android:text="Sad"
                             android:textSize="12sp"
                             android:textColor="#2C3E50"/>
                     </LinearLayout>
