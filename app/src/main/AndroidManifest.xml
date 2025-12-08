@@ -41,7 +41,11 @@
         <activity android:name=".MainPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".DietoryPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".MentalWellnessPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+        <activity android:name=".HistoryDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+        <activity android:name=".DiaryDetailActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+        <activity android:name=".WriteDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".ProfileActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+
     </application>
 
 </manifest>

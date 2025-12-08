@@ -281,13 +281,23 @@
                 android:id="@+id/write_diary_button"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
-                android:background="@color/white"
+                android:backgroundTint="#FFFF00"
                 android:text="✏️ Write Diary"
                 android:textSize="20sp"
                 android:textColor="#FF000000"
                 android:textStyle="bold"
                 android:gravity="center"
                 android:layout_marginBottom="40dp"/>
+            <Button
+                android:id="@+id/btn_view_history"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#2196F3"
+                android:text="📅 View History"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
 
             <LinearLayout
                 android:layout_width="match_parent"
