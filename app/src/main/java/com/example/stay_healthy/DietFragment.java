@@ -51,12 +51,11 @@ import okhttp3.Response;
 
 public class DietFragment extends Fragment {
 
-    // ⚠️⚠️⚠️ 请在这里填入你的 Google Gemini API Key ⚠️⚠️⚠️
-    // 去 https://aistudio.google.com/app/apikey 申请
+
     private static final String GEMINI_API_KEY = "AIzaSyCG-vTBmCNeYtwbiXeJdbTannwllwLZDCk";
 
     // Gemini 1.5 Flash 接口地址
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_API_KEY;
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY.trim();
 
     // 网络请求工具
     private final OkHttpClient client = new OkHttpClient.Builder()
