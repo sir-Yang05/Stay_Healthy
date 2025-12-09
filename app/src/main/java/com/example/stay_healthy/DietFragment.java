@@ -1,4 +1,4 @@
-package com.example.stay_healthy; // ⚠️ 确认包名
+package com.example.stay_healthy;
 
 import android.Manifest;
 import android.app.Activity;
@@ -158,9 +158,7 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
-    // ==========================================
-    // 🤖 GEMINI AI 识别核心逻辑 🤖
-    // ==========================================
+
 
     // 1. 图片转 Base64 字符串
     private String bitmapToBase64(Bitmap bitmap) {
@@ -178,10 +176,10 @@ public class DietFragment extends Fragment {
 
         // 更新 UI 提示
         if (tempTvAiHint != null) {
-            tempTvAiHint.setText("Gemini AI 正在分析... 请稍候");
+            tempTvAiHint.setText("Gemini AI Analyzing... Please wait.");
             tempTvAiHint.setTextColor(0xFFC0FF00); // 荧光绿
         }
-        if (tempEtName != null) tempEtName.setText("思考中...");
+        if (tempEtName != null) tempEtName.setText("Thinking...");
         if (tempEtCal != null) tempEtCal.setText("");
 
         String base64Image = bitmapToBase64(imageBitmap);
@@ -191,7 +189,7 @@ public class DietFragment extends Fragment {
         String jsonBody = "{"
                 + "\"contents\": [{"
                 + "  \"parts\": ["
-                + "    {\"text\": \"你是一位营养师。识别这张图片里的食物，并预估它的卡路里。请只返回一个 JSON 对象，格式必须是：{\\\"food_name\\\": \\\"食物名称\\\", \\\"calories\\\": 0}。不要使用 markdown 格式，不要加 ```json 标签，直接返回纯 JSON 字符串。\"},"
+                + "    {\"text\": \"You are a nutritionist. Identify the food in this image and estimate its calories. Please return only one JSON object, formatted as follows：{\\\"food_name\\\": \\\"Food Name\\\", \\\"calories\\\": 0}。Do not use Markdown formatting. Do not add ```json tags. Return the JSON string directly.\"},"
                 + "    {\"inline_data\": {"
                 + "      \"mime_type\": \"image/jpeg\","
                 + "      \"data\": \"" + base64Image + "\""
@@ -209,8 +207,8 @@ public class DietFragment extends Fragment {
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 e.printStackTrace();
                 runOnUi(() -> {
-                    Toast.makeText(getContext(), "网络错误，请检查网络", Toast.LENGTH_SHORT).show();
-                    if (tempTvAiHint != null) tempTvAiHint.setText("连接失败");
+                    Toast.makeText(getContext(), "Network error. Please check your network connection.", Toast.LENGTH_SHORT).show();
+                    if (tempTvAiHint != null) tempTvAiHint.setText("Connection failed");
                     if (tempEtName != null) tempEtName.setText("");
                 });
             }
@@ -237,23 +235,23 @@ public class DietFragment extends Fragment {
                             if (tempEtName != null) tempEtName.setText(result.foodName);
                             if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
                             if (tempTvAiHint != null) {
-                                tempTvAiHint.setText("识别完成！");
+                                tempTvAiHint.setText("Recognition complete!");
                                 tempTvAiHint.setTextColor(Color.LTGRAY);
                             }
-                            Toast.makeText(getContext(), "识别成功: " + result.foodName, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "Recognition successful: " + result.foodName, Toast.LENGTH_SHORT).show();
                         });
 
                     } catch (Exception e) {
                         e.printStackTrace();
                         runOnUi(() -> {
-                            Toast.makeText(getContext(), "解析失败，请重试", Toast.LENGTH_SHORT).show();
-                            if (tempEtName != null) tempEtName.setText("解析错误");
+                            Toast.makeText(getContext(), "Parsing failed. Please try again.", Toast.LENGTH_SHORT).show();
+                            if (tempEtName != null) tempEtName.setText("Parsing error");
                         });
                     }
                 } else {
                     runOnUi(() -> {
-                        Toast.makeText(getContext(), "API 错误: " + response.code(), Toast.LENGTH_SHORT).show();
-                        if (tempTvAiHint != null) tempTvAiHint.setText("服务器错误");
+                        Toast.makeText(getContext(), "API Error: " + response.code(), Toast.LENGTH_SHORT).show();
+                        if (tempTvAiHint != null) tempTvAiHint.setText("Server Error");
                     });
                 }
             }
