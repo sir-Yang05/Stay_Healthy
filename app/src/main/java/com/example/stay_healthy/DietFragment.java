@@ -344,7 +344,7 @@ public class DietFragment extends Fragment {
         layout.addView(btnCamera);
 
         tempTvAiHint = new TextView(getContext());
-        tempTvAiHint.setText("点击相机进行 AI 识别");
+        tempTvAiHint.setText("Tap the camera for AI recognition");
         tempTvAiHint.setTextColor(Color.LTGRAY);
         tempTvAiHint.setTextSize(12);
         tempTvAiHint.setGravity(Gravity.CENTER);
