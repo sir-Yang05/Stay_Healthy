@@ -1,11 +1,17 @@
-package com.example.stay_healthy; // ⚠️ CHECK YOUR PACKAGE NAME!
+package com.example.stay_healthy;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.GestureDetector; // 引入手势识别
+import android.view.Gravity;
+import android.view.MotionEvent; // 引入触控事件
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -13,8 +19,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.transition.TransitionManager;
+import androidx.transition.AutoTransition;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -31,25 +40,35 @@ import com.google.android.gms.maps.model.LatLng;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.Random;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private AppDatabase db;
-
-    // Timer Variables
     private int seconds = 0;
     private boolean running = true;
-
-    // Data Variables
+    private String currentType = "Running";
     private double totalDistance = 0.0;
-    private String currentType = "Running"; // Default
+    private Location lastLocation;
+    private int lastKmSeconds = 0;
+    private int lastKmInt = 0;
 
-    // UI Components
+    // UI Variables
     private TextView tvTimer, tvCalories, tvDistance, tvPace, tvAvgPace, tvAvgSpeed;
-    private LinearLayout rowStats2; // Container for the second row of stats
+    private LinearLayout rowStats2;
+    private TextView tvPageTitle;
+    private TextView tabSummary, tabBreakdown;
+    private View viewSummary, viewBreakdown;
+    private LinearLayout layoutSplitsContainer;
+    private View btnDone;
+    // ❌ 删除了 btnCollapse 的引用
+    private LinearLayout layoutTabs;
+    private LinearLayout collapsibleContent;
+    private ConstraintLayout bottomPanel; // 绑定整个底部面板
 
-    // Map & Location
+    // 手势识别
+    private GestureDetector gestureDetector;
+
+    // Map Variables
     private GoogleMap mMap;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
@@ -60,23 +79,30 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
 
-        // Hide the default Action Bar
         if (getSupportActionBar() != null) getSupportActionBar().hide();
-
-        // Initialize Database
         db = AppDatabase.getInstance(this);
-
-        // Initialize Location Services
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        // Get Sport Type passed from HomeFragment
         if (getIntent().hasExtra("SPORT_TYPE")) {
             currentType = getIntent().getStringExtra("SPORT_TYPE");
         }
 
-        // Bind Views
+        initViews();
+        setupUIForSport(currentType);
+        setupTabs();
+
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        if (mapFragment != null) mapFragment.getMapAsync(this);
+
+        runTimer();
+    }
+
+    private void initViews() {
+        tvPageTitle = findViewById(R.id.tv_page_title);
+        if (tvPageTitle != null) tvPageTitle.setVisibility(View.GONE);
+
         ImageView btnBack = findViewById(R.id.btn_back_run);
-        Button btnDone = findViewById(R.id.btn_stop);
+        btnDone = findViewById(R.id.btn_stop);
 
         tvTimer = findViewById(R.id.tv_timer);
         tvCalories = findViewById(R.id.tv_calories_run);
@@ -86,31 +112,146 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tvAvgSpeed = findViewById(R.id.tv_avg_speed);
         rowStats2 = findViewById(R.id.row_stats_2);
 
-        // Load Map
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        }
+        tabSummary = findViewById(R.id.tab_summary);
+        tabBreakdown = findViewById(R.id.tab_breakdown);
+        viewSummary = findViewById(R.id.view_summary);
+        viewBreakdown = findViewById(R.id.view_breakdown);
+        layoutSplitsContainer = findViewById(R.id.layout_splits_container);
 
-        // Setup UI based on Sport Type (Hide distance for Basketball etc.)
-        setupUIForSport(currentType);
+        layoutTabs = findViewById(R.id.layout_tabs);
+        collapsibleContent = findViewById(R.id.collapsible_content);
+        // ❌ 删除了 btnCollapse 的绑定
+        bottomPanel = findViewById(R.id.bottom_panel); // 绑定整个底部面板
 
-        // Start Timer
-        runTimer();
-
-        // Button Listeners
         btnBack.setOnClickListener(v -> finish());
 
         btnDone.setOnClickListener(v -> {
             running = false;
-            stopLocationUpdates(); // Stop GPS to save battery
+            stopLocationUpdates();
             saveWorkoutData();
+        });
+
+        // 🟢 设置手势识别
+        gestureDetector = new GestureDetector(this, new CollapseGestureListener());
+        bottomPanel.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                // 只有当面板展开时才允许滑动收起
+                if (collapsibleContent.getVisibility() == View.VISIBLE) {
+                    return gestureDetector.onTouchEvent(event);
+                }
+                // 当面板收起时，点击任意处恢复
+                if (event.getAction() == MotionEvent.ACTION_UP && collapsibleContent.getVisibility() == View.GONE) {
+                    togglePanel();
+                    return true;
+                }
+                return gestureDetector.onTouchEvent(event);
+            }
         });
     }
 
-    // --- Map Logic ---
+    // 🟢 新增：手势监听器
+    private class CollapseGestureListener extends GestureDetector.SimpleOnGestureListener {
+        private static final int SWIPE_VELOCITY_THRESHOLD = 1000; // 快速滑动的速度阈值
 
+        @Override
+        public boolean onDown(MotionEvent e) {
+            return true; // 必须返回 true 才能接收后续事件
+        }
+
+        @Override
+        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+            float diffY = e2.getY() - e1.getY();
+
+            // 只有当垂直滑动距离足够大，并且速度超过阈值时才触发
+            if (Math.abs(diffY) > 100 && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
+                if (diffY < 0) {
+                    // 向上滑动 (收起)
+                    if (collapsibleContent.getVisibility() == View.VISIBLE) {
+                        togglePanel();
+                        return true;
+                    }
+                } else {
+                    // 向下滑动 (展开)
+                    if (collapsibleContent.getVisibility() == View.GONE) {
+                        togglePanel();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    // 🟢 切换面板可见性 (丝滑动画)
+    private void togglePanel() {
+        if (collapsibleContent == null || layoutTabs == null || bottomPanel == null) return;
+
+        // 开启平滑过渡动画
+        TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+
+        if (collapsibleContent.getVisibility() == View.VISIBLE) {
+            // 当前是展开状态 -> 收起
+            collapsibleContent.setVisibility(View.GONE);
+            layoutTabs.setVisibility(View.GONE);
+            // ❌ 删除了 btnCollapse 的旋转逻辑
+        } else {
+            // 当前是收起状态 -> 展开 (默认展开到 SUMMARY)
+            collapsibleContent.setVisibility(View.VISIBLE);
+            layoutTabs.setVisibility(View.VISIBLE);
+            viewSummary.setVisibility(View.VISIBLE);
+            viewBreakdown.setVisibility(View.GONE);
+            // ❌ 删除了 btnCollapse 的旋转逻辑
+        }
+    }
+
+    // ... 其他方法保持不变 ...
+
+    private void setupTabs() {
+        if (tabSummary == null || tabBreakdown == null || bottomPanel == null) return;
+
+        tabSummary.setOnClickListener(v -> {
+            tabSummary.setTextColor(0xFFC0FF00);
+            tabBreakdown.setTextColor(Color.GRAY);
+            TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+            if (viewSummary != null) viewSummary.setVisibility(View.VISIBLE);
+            if (viewBreakdown != null) viewBreakdown.setVisibility(View.GONE);
+        });
+
+        tabBreakdown.setOnClickListener(v -> {
+            tabBreakdown.setTextColor(0xFFC0FF00);
+            tabSummary.setTextColor(Color.GRAY);
+            TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+            if (viewSummary != null) viewSummary.setVisibility(View.GONE);
+            if (viewBreakdown != null) viewBreakdown.setVisibility(View.VISIBLE);
+        });
+    }
+
+    private void addSplitRow(int kmIndex, String time) {
+        if (layoutSplitsContainer == null) return;
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 20, 0, 20);
+
+        TextView tvKm = new TextView(this);
+        tvKm.setText(kmIndex + " km");
+        tvKm.setTextColor(Color.WHITE);
+        tvKm.setTextSize(16);
+        tvKm.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView tvTime = new TextView(this);
+        tvTime.setText(time);
+        tvTime.setTextColor(0xFFC0FF00);
+        tvTime.setTextSize(16);
+        tvTime.setGravity(Gravity.END);
+        tvTime.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        row.addView(tvKm);
+        row.addView(tvTime);
+        layoutSplitsContainer.addView(row, 0);
+    }
+
+    // --- 地图与定位 ---
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
@@ -118,50 +259,82 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     }
 
     private void checkPermissionAndEnableLocation() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             enableMyLocation();
         } else {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    LOCATION_PERMISSION_REQUEST_CODE);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
     private void enableMyLocation() {
         try {
             if (mMap != null) {
-                mMap.setMyLocationEnabled(true); // Show Blue Dot
+                mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
                 startLocationUpdates();
             }
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        }
+        } catch (SecurityException e) { e.printStackTrace(); }
     }
 
     private void startLocationUpdates() {
-        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 4000)
-                .setMinUpdateIntervalMillis(2000)
-                .build();
-
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+                .setMinUpdateIntervalMillis(2000).build();
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
+                if (!running) return;
                 if (locationResult.getLastLocation() != null) {
-                    double lat = locationResult.getLastLocation().getLatitude();
-                    double lng = locationResult.getLastLocation().getLongitude();
-                    LatLng currentLatLng = new LatLng(lat, lng);
-
-                    if (mMap != null) {
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 17f));
-                    }
+                    Location currentLocation = locationResult.getLastLocation();
+                    LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+                    if (mMap != null) mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18f));
+                    if (isBallSport(currentType)) return;
+                    updateDistanceAndSpeed(currentLocation);
                 }
             }
         };
-
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+        }
+    }
+
+    private void updateDistanceAndSpeed(Location currentLocation) {
+        if (lastLocation != null) {
+            float distanceMeters = currentLocation.distanceTo(lastLocation);
+            if (distanceMeters > 2) totalDistance += (distanceMeters / 1000.0);
+        }
+        lastLocation = currentLocation;
+
+        int currentKmInt = (int) totalDistance;
+        if (currentKmInt > lastKmInt) {
+            int secondsForThisKm = seconds - lastKmSeconds;
+            lastKmSeconds = seconds;
+            lastKmInt = currentKmInt;
+            int pMin = secondsForThisKm / 60;
+            int pSec = secondsForThisKm % 60;
+            addSplitRow(currentKmInt, String.format(Locale.getDefault(), "%d:%02d", pMin, pSec));
+        }
+
+        float speedMs = currentLocation.getSpeed();
+        float speedKmh = speedMs * 3.6f;
+        if (speedKmh > 1.0) {
+            double paceValue = 60.0 / speedKmh;
+            if (tvPace != null) tvPace.setText(formatPace(paceValue));
+        } else {
+            if (tvPace != null) tvPace.setText("0:00");
+        }
+
+        if (tvDistance != null) tvDistance.setText(String.format(Locale.getDefault(), "%.2f", totalDistance));
+
+        double calFactor = 60.0;
+        if (currentType.equals("Cycling")) calFactor = 25.0;
+        if (currentType.equals("Walking")) calFactor = 50.0;
+        int calories = (int) (totalDistance * calFactor);
+        if (tvCalories != null) tvCalories.setText(String.valueOf(calories));
+
+        if (seconds > 0) {
+            double avgSpeed = totalDistance / (seconds / 3600.0);
+            if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeed));
+            if (avgSpeed > 1.0 && tvAvgPace != null) tvAvgPace.setText(formatPace(60.0 / avgSpeed));
         }
     }
 
@@ -174,40 +347,30 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                enableMyLocation();
-            } else {
-                Toast.makeText(this, "Location permission required for map", Toast.LENGTH_LONG).show();
-            }
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            enableMyLocation();
         }
     }
 
-    // --- UI & Timer Logic ---
-
+    // --- 计时器与 UI ---
     private void setupUIForSport(String type) {
-        boolean isDistanceSport = type.equals("Running") || type.equals("Walking") || type.equals("Cycling");
-
-        // If it's NOT a distance sport (like Basketball), hide distance/pace fields
-        if (!isDistanceSport) {
-            if (tvDistance != null && tvDistance.getParent() instanceof View) {
-                ((View) tvDistance.getParent()).setVisibility(View.GONE);
-            }
-            if (tvPace != null && tvPace.getParent() instanceof View) {
-                ((View) tvPace.getParent()).setVisibility(View.GONE);
-            }
+        if (isBallSport(type)) {
+            if (tvDistance != null && ((View)tvDistance.getParent()).getVisibility() != View.GONE) ((View)tvDistance.getParent()).setVisibility(View.GONE);
+            if (tvPace != null && ((View)tvPace.getParent()).getVisibility() != View.GONE) ((View)tvPace.getParent()).setVisibility(View.GONE);
             if (rowStats2 != null) rowStats2.setVisibility(View.GONE);
+            if (tabBreakdown != null) tabBreakdown.setVisibility(View.GONE);
         }
+    }
+
+    private boolean isBallSport(String type) {
+        return type.equals("Basketball") || type.equals("Badminton");
     }
 
     private void runTimer() {
         final Handler handler = new Handler(Looper.getMainLooper());
-        final Random random = new Random();
-
         handler.post(new Runnable() {
             @Override
             public void run() {
-                // Update Time
                 int hours = seconds / 3600;
                 int minutes = (seconds % 3600) / 60;
                 int secs = seconds % 60;
@@ -215,42 +378,10 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 if (tvTimer != null) tvTimer.setText(time);
 
                 if (running) {
-                    // Logic: Calculate Data based on sport type
-                    if (currentType.equals("Basketball") || currentType.equals("Badminton")) {
-                        // Time-based calculation
+                    if (isBallSport(currentType)) {
                         double kcalPerSec = (currentType.equals("Basketball")) ? 0.13 : 0.1;
                         int totalCal = (int) (seconds * kcalPerSec);
                         if (tvCalories != null) tvCalories.setText(String.valueOf(totalCal));
-                    } else {
-                        // Distance-based calculation
-                        double speedFactor = 1.0;
-                        if (currentType.equals("Walking")) speedFactor = 0.6;
-                        if (currentType.equals("Cycling")) speedFactor = 2.5;
-
-                        // Simulate speed variation
-                        double currentSpeedKmh = (8.0 + (random.nextDouble() * 4.0)) * speedFactor;
-                        double distanceThisSecond = currentSpeedKmh / 3600.0;
-                        totalDistance += distanceThisSecond;
-
-                        if (tvDistance != null) tvDistance.setText(String.format(Locale.getDefault(), "%.2f", totalDistance));
-
-                        double calFactor = 60.0;
-                        if (currentType.equals("Cycling")) calFactor = 25.0;
-                        if (currentType.equals("Walking")) calFactor = 50.0;
-                        int calories = (int) (totalDistance * calFactor);
-                        if (tvCalories != null) tvCalories.setText(String.valueOf(calories));
-
-                        double currentPaceVal = 60.0 / currentSpeedKmh;
-                        if (tvPace != null) tvPace.setText(formatPace(currentPaceVal));
-
-                        double avgSpeedVal = 0;
-                        if (seconds > 0) avgSpeedVal = totalDistance / (seconds / 3600.0);
-                        if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeedVal));
-
-                        if (avgSpeedVal > 0) {
-                            double avgPaceVal = 60.0 / avgSpeedVal;
-                            if (tvAvgPace != null) tvAvgPace.setText(formatPace(avgPaceVal));
-                        }
                     }
                     seconds++;
                     handler.postDelayed(this, 1000);
@@ -260,6 +391,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     }
 
     private String formatPace(double paceValue) {
+        if (paceValue > 99) return "--:--";
         int paceMin = (int) paceValue;
         int paceSec = (int) ((paceValue - paceMin) * 60);
         return String.format(Locale.getDefault(), "%d:%02d", paceMin, paceSec);
@@ -267,26 +399,19 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void saveWorkoutData() {
         try {
-            // Use simple date format to avoid 'Illegal pattern character' error
             SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
             String currentDate = "TODAY - " + sdf.format(new Date());
-
             String durationStr = (seconds < 60) ? seconds + " secs" : (seconds / 60) + " mins";
-            String caloriesRaw = (tvCalories != null) ? tvCalories.getText().toString() : "0";
-            String caloriesStr = caloriesRaw + " kcal";
-
+            String caloriesStr = (tvCalories != null ? tvCalories.getText().toString() : "0") + " kcal";
             Workout newWorkout = new Workout(currentType, durationStr, caloriesStr, currentDate);
-
             if (db != null) {
                 db.workoutDao().insert(newWorkout);
-                Toast.makeText(this, "Workout Saved!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
                 finish();
-            } else {
-                Toast.makeText(this, "Error: Database not initialized", Toast.LENGTH_SHORT).show();
             }
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Save Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 }
