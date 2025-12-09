@@ -377,7 +377,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         return type.equals("Basketball") || type.equals("Badminton");
     }
 
-    // 🟢 核心计时器逻辑 (基于系统时间)
+    // 核心计时器逻辑 (基于系统时间)
     private void runTimer() {
         if (!running) return;
 
@@ -399,10 +399,10 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                     // 计算两位数的毫秒 (00-99)
                     int ms = (int) (totalTimeMillis % 1000) / 10;
 
-                    // ⚠️ 格式化时间：将秒后的冒号从 tvTimerMain 中移出，留给 tvMilliseconds
+                    // ⚠️ 格式化时间：主计时器移除秒后的分隔符
                     String time = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
-                    // 🟢 毫秒格式：在前面添加冒号 (使用小字体 20sp)
-                    String msString = String.format(Locale.getDefault(), ":%02d", ms);
+                    // 🟢 毫秒格式：前面添加冒号 (使用小字体 20sp)
+                    String msString = String.format(Locale.getDefault(), ".%02d", ms);
 
                     if (tvTimerMain != null) tvTimerMain.setText(time);
                     if (tvMilliseconds != null) tvMilliseconds.setText(msString);
