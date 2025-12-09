@@ -1,12 +1,10 @@
 package com.example.stay_healthy;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.fragment.app.Fragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationBarView;
 
@@ -17,29 +15,40 @@ public class MainPage extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_page);
 
-        BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
-        bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+
+        bottomNav.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                Fragment selectedFragment = null;
                 int itemId = item.getItemId();
-                if (itemId == R.id.exercise) {
-                    startActivity(new Intent(MainPage.this, MainPage.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-                    return true;
-                } else if (itemId == R.id.dietary) {
-                    startActivity(new Intent(MainPage.this, DietoryPage.class));
-                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                    return true;
-                } else if (itemId == R.id.mental) {
-                    startActivity(new Intent(MainPage.this, MentalWellnessPage.class));
-                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                    return true;
-                } else if (itemId == R.id.profile) {
-                    startActivity(new Intent(MainPage.this, ProfileActivity.class));
-                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                    return true;
+
+                // ✅ 统一：全部都用 Fragment，不要用 Intent 跳转
+                if (itemId == R.id.nav_home) {
+                    selectedFragment = new HomeFragment();
+                } else if (itemId == R.id.nav_diet) {
+                    selectedFragment = new DietFragment();
+                } else if (itemId == R.id.nav_mental) {
+                    selectedFragment = new MentalWellnessPage(); // 确保你有这个文件
+                } else if (itemId == R.id.nav_profile) {
+                    selectedFragment = new ProfileFragment(); // 确保你有这个文件
                 }
-                return false;
+
+                if (selectedFragment != null) {
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.fragment_container, selectedFragment)
+                            .commit();
+                }
+                return true;
             }
         });
+
+        // 默认显示 Sport
+        if (savedInstanceState == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new HomeFragment())
+                    .commit();
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
     }
 }

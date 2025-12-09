@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".MyApplication"
@@ -17,9 +25,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Stay_Healthy"
         tools:ignore="ExtraText">
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyD2Pw8IPk8VQvPK5j6iXptgP_F8nd7zy48" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,7 +38,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
         <activity android:name=".LoginActivity" android:exported="false"
@@ -39,13 +48,13 @@
             android:theme="@style/Theme.Stay_Healthy.NoActionBar" />
 
         <activity android:name=".MainPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".DietoryPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".MentalWellnessPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+
         <activity android:name=".HistoryDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".DiaryDetailActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".WriteDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".ProfileActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
 
+
+        <activity android:name=".RunningActivity" android:exported="false" />
     </application>
 
 </manifest>
