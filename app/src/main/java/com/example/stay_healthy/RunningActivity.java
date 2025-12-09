@@ -3,15 +3,14 @@ package com.example.stay_healthy;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.content.res.ColorStateList;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.GestureDetector; // 引入手势识别
-import android.view.Gravity;
-import android.view.MotionEvent; // 引入触控事件
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Gravity;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -19,7 +18,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.transition.TransitionManager;
@@ -59,20 +57,23 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private TextView tabSummary, tabBreakdown;
     private View viewSummary, viewBreakdown;
     private LinearLayout layoutSplitsContainer;
-    private View btnDone;
-    // ❌ 删除了 btnCollapse 的引用
+    private Button btnDone;
+    private Button btnPauseResume;
+    private ImageView btnCollapse;
     private LinearLayout layoutTabs;
     private LinearLayout collapsibleContent;
-    private ConstraintLayout bottomPanel; // 绑定整个底部面板
-
-    // 手势识别
-    private GestureDetector gestureDetector;
+    private View bottomPanel;
 
     // Map Variables
     private GoogleMap mMap;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+
+    // 颜色常量
+    private final int COLOR_GRAY = Color.parseColor("#808080");
+    private final int COLOR_WHITE = Color.parseColor("#FFFFFF");
+    private final int COLOR_BLACK = Color.parseColor("#000000");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,7 +103,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         if (tvPageTitle != null) tvPageTitle.setVisibility(View.GONE);
 
         ImageView btnBack = findViewById(R.id.btn_back_run);
+
         btnDone = findViewById(R.id.btn_stop);
+        btnPauseResume = findViewById(R.id.btn_pause_resume);
 
         tvTimer = findViewById(R.id.tv_timer);
         tvCalories = findViewById(R.id.tv_calories_run);
@@ -120,92 +123,69 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         layoutTabs = findViewById(R.id.layout_tabs);
         collapsibleContent = findViewById(R.id.collapsible_content);
-        // ❌ 删除了 btnCollapse 的绑定
-        bottomPanel = findViewById(R.id.bottom_panel); // 绑定整个底部面板
+
+        btnCollapse = findViewById(R.id.btn_collapse);
+        bottomPanel = findViewById(R.id.bottom_panel);
 
         btnBack.setOnClickListener(v -> finish());
 
+        btnCollapse.setOnClickListener(v -> togglePanel());
+
+        // 确保初始状态正确：running=true, 显示PAUSE, 灰色背景
+        running = true;
+        btnPauseResume.setText("PAUSE");
+        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
+        btnPauseResume.setTextColor(COLOR_WHITE);
+
+        // DONE 按钮逻辑 (停止并保存)
         btnDone.setOnClickListener(v -> {
             running = false;
             stopLocationUpdates();
             saveWorkoutData();
         });
 
-        // 🟢 设置手势识别
-        gestureDetector = new GestureDetector(this, new CollapseGestureListener());
-        bottomPanel.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                // 只有当面板展开时才允许滑动收起
-                if (collapsibleContent.getVisibility() == View.VISIBLE) {
-                    return gestureDetector.onTouchEvent(event);
-                }
-                // 当面板收起时，点击任意处恢复
-                if (event.getAction() == MotionEvent.ACTION_UP && collapsibleContent.getVisibility() == View.GONE) {
-                    togglePanel();
-                    return true;
-                }
-                return gestureDetector.onTouchEvent(event);
+        // PAUSE/RESUME 按钮逻辑
+        btnPauseResume.setOnClickListener(v -> {
+            if (running) {
+                // 当前正在运行 -> 暂停 (显示 RESUME)
+                running = false;
+                stopLocationUpdates();
+                btnPauseResume.setText("RESUME");
+                btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
+                btnPauseResume.setTextColor(COLOR_BLACK);
+                // ⚠️ 已移除 Toast 提示
+            } else {
+                // 当前已暂停 -> 继续 (显示 PAUSE)
+                running = true;
+                startLocationUpdates();
+                runTimer(); // 重新启动计时器循环
+                btnPauseResume.setText("PAUSE");
+                btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
+                btnPauseResume.setTextColor(COLOR_WHITE);
+                // ⚠️ 已移除 Toast 提示
             }
         });
     }
 
-    // 🟢 新增：手势监听器
-    private class CollapseGestureListener extends GestureDetector.SimpleOnGestureListener {
-        private static final int SWIPE_VELOCITY_THRESHOLD = 1000; // 快速滑动的速度阈值
-
-        @Override
-        public boolean onDown(MotionEvent e) {
-            return true; // 必须返回 true 才能接收后续事件
-        }
-
-        @Override
-        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            float diffY = e2.getY() - e1.getY();
-
-            // 只有当垂直滑动距离足够大，并且速度超过阈值时才触发
-            if (Math.abs(diffY) > 100 && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
-                if (diffY < 0) {
-                    // 向上滑动 (收起)
-                    if (collapsibleContent.getVisibility() == View.VISIBLE) {
-                        togglePanel();
-                        return true;
-                    }
-                } else {
-                    // 向下滑动 (展开)
-                    if (collapsibleContent.getVisibility() == View.GONE) {
-                        togglePanel();
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-    }
-
-    // 🟢 切换面板可见性 (丝滑动画)
     private void togglePanel() {
-        if (collapsibleContent == null || layoutTabs == null || bottomPanel == null) return;
+        if (collapsibleContent == null || layoutTabs == null || btnCollapse == null || bottomPanel == null) return;
 
-        // 开启平滑过渡动画
-        TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+        TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
 
         if (collapsibleContent.getVisibility() == View.VISIBLE) {
-            // 当前是展开状态 -> 收起
             collapsibleContent.setVisibility(View.GONE);
             layoutTabs.setVisibility(View.GONE);
-            // ❌ 删除了 btnCollapse 的旋转逻辑
+            btnCollapse.setRotation(270);
         } else {
-            // 当前是收起状态 -> 展开 (默认展开到 SUMMARY)
             collapsibleContent.setVisibility(View.VISIBLE);
             layoutTabs.setVisibility(View.VISIBLE);
-            viewSummary.setVisibility(View.VISIBLE);
-            viewBreakdown.setVisibility(View.GONE);
-            // ❌ 删除了 btnCollapse 的旋转逻辑
+            btnCollapse.setRotation(90);
+
+            if(viewSummary.getVisibility() == View.GONE && viewBreakdown.getVisibility() == View.GONE) {
+                viewSummary.setVisibility(View.VISIBLE);
+            }
         }
     }
-
-    // ... 其他方法保持不变 ...
 
     private void setupTabs() {
         if (tabSummary == null || tabBreakdown == null || bottomPanel == null) return;
@@ -213,7 +193,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tabSummary.setOnClickListener(v -> {
             tabSummary.setTextColor(0xFFC0FF00);
             tabBreakdown.setTextColor(Color.GRAY);
-            TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+            TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
             if (viewSummary != null) viewSummary.setVisibility(View.VISIBLE);
             if (viewBreakdown != null) viewBreakdown.setVisibility(View.GONE);
         });
@@ -221,7 +201,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tabBreakdown.setOnClickListener(v -> {
             tabBreakdown.setTextColor(0xFFC0FF00);
             tabSummary.setTextColor(Color.GRAY);
-            TransitionManager.beginDelayedTransition(bottomPanel, new AutoTransition());
+            TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
             if (viewSummary != null) viewSummary.setVisibility(View.GONE);
             if (viewBreakdown != null) viewBreakdown.setVisibility(View.VISIBLE);
         });
@@ -237,17 +217,15 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tvKm.setText(kmIndex + " km");
         tvKm.setTextColor(Color.WHITE);
         tvKm.setTextSize(16);
-        tvKm.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        row.addView(tvKm);
 
         TextView tvTime = new TextView(this);
         tvTime.setText(time);
         tvTime.setTextColor(0xFFC0FF00);
         tvTime.setTextSize(16);
         tvTime.setGravity(Gravity.END);
-        tvTime.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-
-        row.addView(tvKm);
         row.addView(tvTime);
+
         layoutSplitsContainer.addView(row, 0);
     }
 
@@ -279,6 +257,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private void startLocationUpdates() {
         LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
                 .setMinUpdateIntervalMillis(2000).build();
+
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
@@ -292,7 +271,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 }
             }
         };
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+        if (running && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
         }
     }
@@ -352,7 +332,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         }
     }
 
-    // --- 计时器与 UI ---
     private void setupUIForSport(String type) {
         if (isBallSport(type)) {
             if (tvDistance != null && ((View)tvDistance.getParent()).getVisibility() != View.GONE) ((View)tvDistance.getParent()).setVisibility(View.GONE);
