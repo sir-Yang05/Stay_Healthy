@@ -1,6 +1,7 @@
-package com.example.stay_healthy;
+package com.example.stay_healthy; // ⚠️ 确认包名
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -10,6 +11,8 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.InputType;
+import android.util.Base64;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,49 +31,79 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import com.google.gson.Gson;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class DietFragment extends Fragment {
 
-    // UI 控件
+    // ⚠️⚠️⚠️ 请在这里填入你的 Google Gemini API Key ⚠️⚠️⚠️
+    // 去 https://aistudio.google.com/app/apikey 申请
+    private static final String GEMINI_API_KEY = "AIzaSyCG-vTBmCNeYtwbiXeJdbTannwllwLZDCk";
+
+    // Gemini 1.5 Flash 接口地址
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_API_KEY;
+
+    // 网络请求工具
+    private final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build();
+    private final Gson gson = new Gson();
+
+    // 界面控件
     private TextView tvCalEaten, tvCalGoalLabel;
     private ProgressBar progressCal;
     private TextView tvBreakfastSummary, tvLunchSummary, tvDinnerSummary;
     private TextView tvWaterCount, tvWaterRec;
     private View cardWater;
-    private ImageView btnClearAll; // 清空按钮
+    private ImageView btnClearAll;
 
-    // 容器 (用于点击管理)
-    private View rowBreakfast, rowLunch, rowDinner;
-
-    // 基础目标
+    // 数据变量
     private static final int BASE_CALORIE_GOAL = 1800;
     private static final int BASE_WATER_GOAL = 2000;
     private int currentWaterMl = 0;
 
+    // 相机与弹窗相关
     private ActivityResultLauncher<Intent> cameraLauncher;
     private EditText tempEtName, tempEtCal;
     private ImageView tempImgPreview;
+    private TextView tempTvAiHint;
+    private View rowBreakfast, rowLunch, rowDinner;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 初始化相机结果回调
         cameraLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    if (result.getResultCode() == -1 && result.getData() != null) {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                         Bundle extras = result.getData().getExtras();
                         Bitmap imageBitmap = (Bitmap) extras.get("data");
+
+                        // 如果弹窗还在，显示预览图
                         if (tempImgPreview != null) {
                             tempImgPreview.setImageBitmap(imageBitmap);
                             tempImgPreview.setVisibility(View.VISIBLE);
                         }
-                        simulateAIAnalysis();
+                        // 📸 开始 Gemini AI 识别
+                        performGeminiAnalysis(imageBitmap);
                     }
                 }
         );
@@ -81,7 +114,7 @@ public class DietFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_diet, container, false);
 
-        // 1. 绑定控件
+        // 绑定控件
         tvCalEaten = view.findViewById(R.id.tv_cal_eaten);
         tvCalGoalLabel = view.findViewById(R.id.tv_cal_goal_label);
         progressCal = view.findViewById(R.id.progress_calories);
@@ -103,21 +136,17 @@ public class DietFragment extends Fragment {
         ImageView btnAddLunch = view.findViewById(R.id.btn_add_lunch);
         ImageView btnAddDinner = view.findViewById(R.id.btn_add_dinner);
 
-        // 2. 设置点击事件 (加号)
+        // 设置点击事件
         btnAddBreakfast.setOnClickListener(v -> showAddFoodDialog("Breakfast"));
         btnAddLunch.setOnClickListener(v -> showAddFoodDialog("Lunch"));
         if (btnAddDinner != null) btnAddDinner.setOnClickListener(v -> showAddFoodDialog("Dinner"));
 
-        // 3. 设置点击事件 (管理/删除单项)
-        // 点击整行 -> 弹出管理列表
+        // 点击整行管理/删除
         rowBreakfast.setOnClickListener(v -> showManageFoodDialog("Breakfast"));
         rowLunch.setOnClickListener(v -> showManageFoodDialog("Lunch"));
         if (rowDinner != null) rowDinner.setOnClickListener(v -> showManageFoodDialog("Dinner"));
 
-        // 4. 设置点击事件 (清空今日)
-        btnClearAll.setOnClickListener(v -> showClearAllDialog());
-
-        // 5. 设置水点击
+        if (btnClearAll != null) btnClearAll.setOnClickListener(v -> showClearAllDialog());
         cardWater.setOnClickListener(v -> showAddWaterDialog());
 
         loadData();
@@ -130,10 +159,121 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
-    // === 核心逻辑：加载数据 ===
+    // ==========================================
+    // 🤖 GEMINI AI 识别核心逻辑 🤖
+    // ==========================================
+
+    // 1. 图片转 Base64 字符串
+    private String bitmapToBase64(Bitmap bitmap) {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
+        byte[] byteArray = byteArrayOutputStream.toByteArray();
+        return Base64.encodeToString(byteArray, Base64.NO_WRAP);
+    }
+
+    // 2. 发送请求给 Gemini
+    private void performGeminiAnalysis(Bitmap imageBitmap) {
+        if (GEMINI_API_KEY.contains("AIzaSy") == false) {
+            // 简单的检查，如果你还没填Key
+        }
+
+        // 更新 UI 提示
+        if (tempTvAiHint != null) {
+            tempTvAiHint.setText("Gemini AI 正在分析... 请稍候");
+            tempTvAiHint.setTextColor(0xFFC0FF00); // 荧光绿
+        }
+        if (tempEtName != null) tempEtName.setText("思考中...");
+        if (tempEtCal != null) tempEtCal.setText("");
+
+        String base64Image = bitmapToBase64(imageBitmap);
+
+        // 构建 Gemini 专用的 JSON 请求体
+        // 我们要求它只返回 JSON 格式，不要废话
+        String jsonBody = "{"
+                + "\"contents\": [{"
+                + "  \"parts\": ["
+                + "    {\"text\": \"你是一位营养师。识别这张图片里的食物，并预估它的卡路里。请只返回一个 JSON 对象，格式必须是：{\\\"food_name\\\": \\\"食物名称\\\", \\\"calories\\\": 0}。不要使用 markdown 格式，不要加 ```json 标签，直接返回纯 JSON 字符串。\"},"
+                + "    {\"inline_data\": {"
+                + "      \"mime_type\": \"image/jpeg\","
+                + "      \"data\": \"" + base64Image + "\""
+                + "    }}"
+                + "  ]"
+                + "}]"
+                + "}";
+
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        Request request = new Request.Builder().url(API_URL).post(body).build();
+
+        // 异步发送请求
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                e.printStackTrace();
+                runOnUi(() -> {
+                    Toast.makeText(getContext(), "网络错误，请检查网络", Toast.LENGTH_SHORT).show();
+                    if (tempTvAiHint != null) tempTvAiHint.setText("连接失败");
+                    if (tempEtName != null) tempEtName.setText("");
+                });
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                String responseBody = response.body().string();
+                Log.d("GEMINI", responseBody); // 在 Logcat 里打印结果方便调试
+
+                if (response.isSuccessful()) {
+                    try {
+                        // 1. 解析 Gemini 的外层结构
+                        GeminiResponse geminiResp = gson.fromJson(responseBody, GeminiResponse.class);
+                        String rawText = geminiResp.candidates.get(0).content.parts.get(0).text;
+
+                        // 2. 清理可能存在的 markdown 符号 (以防万一)
+                        rawText = rawText.replace("```json", "").replace("```", "").trim();
+
+                        // 3. 解析我们需要的食物数据
+                        AiFoodResult result = gson.fromJson(rawText, AiFoodResult.class);
+
+                        // 4. 回到主线程更新 UI
+                        runOnUi(() -> {
+                            if (tempEtName != null) tempEtName.setText(result.foodName);
+                            if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
+                            if (tempTvAiHint != null) {
+                                tempTvAiHint.setText("识别完成！");
+                                tempTvAiHint.setTextColor(Color.LTGRAY);
+                            }
+                            Toast.makeText(getContext(), "识别成功: " + result.foodName, Toast.LENGTH_SHORT).show();
+                        });
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        runOnUi(() -> {
+                            Toast.makeText(getContext(), "解析失败，请重试", Toast.LENGTH_SHORT).show();
+                            if (tempEtName != null) tempEtName.setText("解析错误");
+                        });
+                    }
+                } else {
+                    runOnUi(() -> {
+                        Toast.makeText(getContext(), "API 错误: " + response.code(), Toast.LENGTH_SHORT).show();
+                        if (tempTvAiHint != null) tempTvAiHint.setText("服务器错误");
+                    });
+                }
+            }
+        });
+    }
+
+    // 辅助方法：切换到主线程更新 UI
+    private void runOnUi(Runnable action) {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(action);
+        }
+    }
+
+    // ==========================================
+    // 常规逻辑 (数据加载、弹窗等)
+    // ==========================================
+
     private void loadData() {
         if (getContext() == null) return;
-
         SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
         currentWaterMl = prefs.getInt("water_ml", 0);
 
@@ -190,87 +330,6 @@ public class DietFragment extends Fragment {
         tvWaterRec.setText("Goal increased by " + exerciseCalories + "ml");
     }
 
-    // === 功能 1：管理/删除单项食物 ===
-    private void showManageFoodDialog(String mealType) {
-        if (getContext() == null) return;
-
-        AppDatabase db = AppDatabase.getInstance(requireContext());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayDate = sdf.format(new Date());
-
-        // 1. 获取当天的所有食物
-        List<Food> allFoods = db.foodDao().getFoodsByDate(todayDate);
-
-        // 2. 筛选出当前餐点的食物 (比如只看早餐)
-        List<Food> mealFoods = new ArrayList<>();
-        List<String> displayList = new ArrayList<>();
-
-        for (Food f : allFoods) {
-            if (mealType.equals(f.mealType)) {
-                mealFoods.add(f);
-                displayList.add(f.name + " (" + f.calories + " kcal)");
-            }
-        }
-
-        if (displayList.isEmpty()) {
-            Toast.makeText(getContext(), "No items to delete in " + mealType, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // 3. 弹出列表对话框
-        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
-                .setTitle("Manage " + mealType)
-                .setItems(displayList.toArray(new String[0]), (dialog, which) -> {
-                    // 点击某一项，确认删除
-                    Food foodToDelete = mealFoods.get(which);
-                    confirmDeleteOne(foodToDelete);
-                })
-                .setNegativeButton("Close", null)
-                .show();
-    }
-
-    private void confirmDeleteOne(Food food) {
-        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
-                .setTitle("Delete Item?")
-                .setMessage("Delete " + food.name + "?")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    AppDatabase.getInstance(requireContext()).foodDao().delete(food);
-                    Toast.makeText(getContext(), "Deleted", Toast.LENGTH_SHORT).show();
-                    loadData(); // 刷新界面
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    // === 功能 2：清空今日所有数据 ===
-    private void showClearAllDialog() {
-        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
-                .setTitle("Reset Day?")
-                .setMessage("Delete ALL food records for today?")
-                .setPositiveButton("Reset", (dialog, which) -> {
-                    clearAllTodayData();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void clearAllTodayData() {
-        if (getContext() == null) return;
-        AppDatabase db = AppDatabase.getInstance(requireContext());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayDate = sdf.format(new Date());
-
-        List<Food> foods = db.foodDao().getFoodsByDate(todayDate);
-        for (Food f : foods) {
-            db.foodDao().delete(f);
-        }
-
-        Toast.makeText(getContext(), "Daily Log Cleared", Toast.LENGTH_SHORT).show();
-        loadData();
-    }
-
-    // --- 以下是原有的添加、拍照等代码 (保持不变) ---
-
     private void showAddFoodDialog(String mealType) {
         if (getContext() == null) return;
         LinearLayout layout = new LinearLayout(getContext());
@@ -287,15 +346,15 @@ public class DietFragment extends Fragment {
         btnCamera.setOnClickListener(v -> openCamera());
         layout.addView(btnCamera);
 
-        TextView tvHint = new TextView(getContext());
-        tvHint.setText("Tap camera to auto-detect");
-        tvHint.setTextColor(Color.LTGRAY);
-        tvHint.setTextSize(12);
-        tvHint.setGravity(Gravity.CENTER);
-        layout.addView(tvHint);
+        tempTvAiHint = new TextView(getContext());
+        tempTvAiHint.setText("点击相机进行 AI 识别");
+        tempTvAiHint.setTextColor(Color.LTGRAY);
+        tempTvAiHint.setTextSize(12);
+        tempTvAiHint.setGravity(Gravity.CENTER);
+        layout.addView(tempTvAiHint);
 
         tempImgPreview = new ImageView(getContext());
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(200, 200);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(400, 400);
         previewParams.topMargin = 20;
         previewParams.bottomMargin = 20;
         tempImgPreview.setLayoutParams(previewParams);
@@ -333,16 +392,6 @@ public class DietFragment extends Fragment {
                 .show();
     }
 
-    private void saveFood(String name, String cal, String mealType) {
-        AppDatabase db = AppDatabase.getInstance(requireContext());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayDate = sdf.format(new Date());
-        Food newFood = new Food(name, cal, mealType, todayDate);
-        db.foodDao().insert(newFood);
-        Toast.makeText(getContext(), "Food Added!", Toast.LENGTH_SHORT).show();
-        loadData();
-    }
-
     private void showAddWaterDialog() {
         if (getContext() == null) return;
         final EditText input = new EditText(getContext());
@@ -371,6 +420,66 @@ public class DietFragment extends Fragment {
                 .show();
     }
 
+    private void saveFood(String name, String cal, String mealType) {
+        AppDatabase db = AppDatabase.getInstance(requireContext());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String todayDate = sdf.format(new Date());
+        Food newFood = new Food(name, cal, mealType, todayDate);
+        db.foodDao().insert(newFood);
+        Toast.makeText(getContext(), "Food Added!", Toast.LENGTH_SHORT).show();
+        loadData();
+    }
+
+    private void showManageFoodDialog(String mealType) {
+        if (getContext() == null) return;
+        AppDatabase db = AppDatabase.getInstance(requireContext());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String todayDate = sdf.format(new Date());
+        List<Food> allFoods = db.foodDao().getFoodsByDate(todayDate);
+        List<Food> mealFoods = new ArrayList<>();
+        List<String> displayList = new ArrayList<>();
+
+        for (Food f : allFoods) {
+            if (mealType.equals(f.mealType)) {
+                mealFoods.add(f);
+                displayList.add(f.name + " (" + f.calories + " kcal)");
+            }
+        }
+
+        if (displayList.isEmpty()) {
+            Toast.makeText(getContext(), "No items to delete", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
+                .setTitle("Manage " + mealType)
+                .setItems(displayList.toArray(new String[0]), (dialog, which) -> {
+                    Food foodToDelete = mealFoods.get(which);
+                    db.foodDao().delete(foodToDelete);
+                    loadData();
+                    Toast.makeText(getContext(), "Deleted", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void showClearAllDialog() {
+        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
+                .setTitle("Reset Day?")
+                .setMessage("Delete ALL food records for today?")
+                .setPositiveButton("Reset", (dialog, which) -> {
+                    AppDatabase db = AppDatabase.getInstance(requireContext());
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    String todayDate = sdf.format(new Date());
+                    List<Food> foods = db.foodDao().getFoodsByDate(todayDate);
+                    for (Food f : foods) db.foodDao().delete(f);
+                    loadData();
+                    Toast.makeText(getContext(), "Daily Log Cleared", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void openCamera() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(requireActivity(), new String[]{Manifest.permission.CAMERA}, 100);
@@ -378,17 +487,5 @@ public class DietFragment extends Fragment {
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             cameraLauncher.launch(takePictureIntent);
         }
-    }
-
-    private void simulateAIAnalysis() {
-        Toast.makeText(getContext(), "AI Analyzing...", Toast.LENGTH_SHORT).show();
-        new android.os.Handler().postDelayed(() -> {
-            String[] foods = {"Apple", "Banana", "Chicken Salad", "Steak", "Rice", "Burger"};
-            int[] cals = {52, 89, 350, 450, 130, 550};
-            int index = new Random().nextInt(foods.length);
-            if (tempEtName != null) tempEtName.setText(foods[index]);
-            if (tempEtCal != null) tempEtCal.setText(String.valueOf(cals[index]));
-            Toast.makeText(getContext(), "Identified: " + foods[index], Toast.LENGTH_SHORT).show();
-        }, 1000);
     }
 }
