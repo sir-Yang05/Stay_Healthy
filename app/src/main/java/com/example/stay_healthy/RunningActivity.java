@@ -42,7 +42,11 @@ import java.util.Locale;
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private AppDatabase db;
-    private int seconds = 0;
+    // 存储已用时间 (暂停时保存)
+    private long totalTimeMillis = 0;
+    // 记录计时开始时的系统时间戳 (用于精确计算)
+    private long startTimeMillis = 0;
+
     private boolean running = true;
     private String currentType = "Running";
     private double totalDistance = 0.0;
@@ -51,7 +55,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private int lastKmInt = 0;
 
     // UI Variables
-    private TextView tvTimer, tvCalories, tvDistance, tvPace, tvAvgPace, tvAvgSpeed;
+    private TextView tvTimerMain, tvMilliseconds;
+    private TextView tvCalories, tvDistance, tvPace, tvAvgPace, tvAvgSpeed;
     private LinearLayout rowStats2;
     private TextView tvPageTitle;
     private TextView tabSummary, tabBreakdown;
@@ -104,10 +109,12 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         ImageView btnBack = findViewById(R.id.btn_back_run);
 
+        tvTimerMain = findViewById(R.id.tv_timer_main);
+        tvMilliseconds = findViewById(R.id.tv_milliseconds);
+
         btnDone = findViewById(R.id.btn_stop);
         btnPauseResume = findViewById(R.id.btn_pause_resume);
 
-        tvTimer = findViewById(R.id.tv_timer);
         tvCalories = findViewById(R.id.tv_calories_run);
         tvDistance = findViewById(R.id.tv_distance);
         tvPace = findViewById(R.id.tv_pace);
@@ -136,6 +143,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         btnPauseResume.setText("PAUSE");
         btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
         btnPauseResume.setTextColor(COLOR_WHITE);
+        // 初始化时，记录计时起始时间
+        startTimeMillis = System.currentTimeMillis();
 
         // DONE 按钮逻辑 (停止并保存)
         btnDone.setOnClickListener(v -> {
@@ -144,25 +153,29 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             saveWorkoutData();
         });
 
-        // PAUSE/RESUME 按钮逻辑
+        // PAUSE/RESUME 按钮逻辑 (使用系统时间)
         btnPauseResume.setOnClickListener(v -> {
             if (running) {
-                // 当前正在运行 -> 暂停 (显示 RESUME)
+                // 当前正在运行 -> 暂停
                 running = false;
                 stopLocationUpdates();
                 btnPauseResume.setText("RESUME");
                 btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
                 btnPauseResume.setTextColor(COLOR_BLACK);
-                // ⚠️ 已移除 Toast 提示
+
+                // 暂停时：将已用时间保存到 totalTimeMillis，并重置 startTimeMillis
+                totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
+                startTimeMillis = 0;
             } else {
-                // 当前已暂停 -> 继续 (显示 PAUSE)
+                // 当前已暂停 -> 继续
                 running = true;
                 startLocationUpdates();
+                // 重新设置起始时间 = 当前系统时间 - 已用时间
+                startTimeMillis = System.currentTimeMillis() - totalTimeMillis;
                 runTimer(); // 重新启动计时器循环
                 btnPauseResume.setText("PAUSE");
                 btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
                 btnPauseResume.setTextColor(COLOR_WHITE);
-                // ⚠️ 已移除 Toast 提示
             }
         });
     }
@@ -207,7 +220,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         });
     }
 
-    private void addSplitRow(int kmIndex, String time) {
+    private void addSplitRow(int kmIndex, String paceTime) {
         if (layoutSplitsContainer == null) return;
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -220,7 +233,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         row.addView(tvKm);
 
         TextView tvTime = new TextView(this);
-        tvTime.setText(time);
+        tvTime.setText(paceTime);
         tvTime.setTextColor(0xFFC0FF00);
         tvTime.setTextSize(16);
         tvTime.setGravity(Gravity.END);
@@ -277,44 +290,62 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         }
     }
 
+    // 核心计时器和数据更新
     private void updateDistanceAndSpeed(Location currentLocation) {
+        // totalSeconds 依赖于 totalTimeMillis 的计算
+        long totalSeconds = totalTimeMillis / 1000;
+
         if (lastLocation != null) {
             float distanceMeters = currentLocation.distanceTo(lastLocation);
             if (distanceMeters > 2) totalDistance += (distanceMeters / 1000.0);
         }
         lastLocation = currentLocation;
 
+        // --- 分段数据 ---
         int currentKmInt = (int) totalDistance;
-        if (currentKmInt > lastKmInt) {
-            int secondsForThisKm = seconds - lastKmSeconds;
-            lastKmSeconds = seconds;
+        if (currentKmInt > lastKmInt && totalSeconds > lastKmSeconds) {
+            int secondsForThisKm = (int) totalSeconds - lastKmSeconds;
+            lastKmSeconds = (int) totalSeconds;
             lastKmInt = currentKmInt;
+
+            // 记录时，使用 min:ss 格式 (Breakdown)
             int pMin = secondsForThisKm / 60;
             int pSec = secondsForThisKm % 60;
-            addSplitRow(currentKmInt, String.format(Locale.getDefault(), "%d:%02d", pMin, pSec));
+            String paceTime = String.format(Locale.getDefault(), "%d:%02d", pMin, pSec);
+            addSplitRow(currentKmInt, paceTime);
         }
 
-        float speedMs = currentLocation.getSpeed();
-        float speedKmh = speedMs * 3.6f;
-        if (speedKmh > 1.0) {
-            double paceValue = 60.0 / speedKmh;
-            if (tvPace != null) tvPace.setText(formatPace(paceValue));
+        // --- 实时速度/配速 (s/m 和 m/s) ---
+        double speedMs = currentLocation.getSpeed();
+
+        if (speedMs > 0.1) {
+            double paceValueSM = 1.0 / speedMs;
+            if (tvPace != null) tvPace.setText(String.format(Locale.getDefault(), "%.1f", paceValueSM));
         } else {
-            if (tvPace != null) tvPace.setText("0:00");
+            if (tvPace != null) tvPace.setText("0.0");
         }
 
+        // --- 更新距离和卡路里 ---
         if (tvDistance != null) tvDistance.setText(String.format(Locale.getDefault(), "%.2f", totalDistance));
-
         double calFactor = 60.0;
         if (currentType.equals("Cycling")) calFactor = 25.0;
         if (currentType.equals("Walking")) calFactor = 50.0;
         int calories = (int) (totalDistance * calFactor);
         if (tvCalories != null) tvCalories.setText(String.valueOf(calories));
 
-        if (seconds > 0) {
-            double avgSpeed = totalDistance / (seconds / 3600.0);
-            if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeed));
-            if (avgSpeed > 1.0 && tvAvgPace != null) tvAvgPace.setText(formatPace(60.0 / avgSpeed));
+        // --- 平均速度/配速 (m/s 和 s/m) ---
+        if (totalSeconds > 0) {
+            double avgSpeedKmh = totalDistance / (totalSeconds / 3600.0);
+            double avgSpeedMs = avgSpeedKmh / 3.6;
+
+            if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeedMs));
+
+            if (avgSpeedMs > 0.1) {
+                double avgPaceSM = 1.0 / avgSpeedMs;
+                if (tvAvgPace != null) tvAvgPace.setText(String.format(Locale.getDefault(), "%.1f", avgPaceSM));
+            } else {
+                if (tvAvgPace != null) tvAvgPace.setText("0.0");
+            }
         }
     }
 
@@ -334,6 +365,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void setupUIForSport(String type) {
         if (isBallSport(type)) {
+            // 球类运动隐藏距离和配速相关数据
             if (tvDistance != null && ((View)tvDistance.getParent()).getVisibility() != View.GONE) ((View)tvDistance.getParent()).setVisibility(View.GONE);
             if (tvPace != null && ((View)tvPace.getParent()).getVisibility() != View.GONE) ((View)tvPace.getParent()).setVisibility(View.GONE);
             if (rowStats2 != null) rowStats2.setVisibility(View.GONE);
@@ -345,46 +377,66 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         return type.equals("Basketball") || type.equals("Badminton");
     }
 
+    // 🟢 核心计时器逻辑 (基于系统时间)
     private void runTimer() {
+        if (!running) return;
+
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             @Override
             public void run() {
-                int hours = seconds / 3600;
-                int minutes = (seconds % 3600) / 60;
-                int secs = seconds % 60;
-                String time = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
-                if (tvTimer != null) tvTimer.setText(time);
-
                 if (running) {
+                    // 1. 基于当前系统时间计算流逝的总时间
+                    long currentTime = System.currentTimeMillis();
+                    totalTimeMillis = currentTime - startTimeMillis;
+
+                    long totalSeconds = totalTimeMillis / 1000;
+
+                    // 2. 时间分解
+                    int hours = (int) totalSeconds / 3600;
+                    int minutes = (int) (totalSeconds % 3600) / 60;
+                    int secs = (int) totalSeconds % 60;
+                    // 计算两位数的毫秒 (00-99)
+                    int ms = (int) (totalTimeMillis % 1000) / 10;
+
+                    // ⚠️ 格式化时间：将秒后的冒号从 tvTimerMain 中移出，留给 tvMilliseconds
+                    String time = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
+                    // 🟢 毫秒格式：在前面添加冒号 (使用小字体 20sp)
+                    String msString = String.format(Locale.getDefault(), ":%02d", ms);
+
+                    if (tvTimerMain != null) tvTimerMain.setText(time);
+                    if (tvMilliseconds != null) tvMilliseconds.setText(msString);
+
+                    // 运动消耗 (球类依然按时间计算)
                     if (isBallSport(currentType)) {
                         double kcalPerSec = (currentType.equals("Basketball")) ? 0.13 : 0.1;
-                        int totalCal = (int) (seconds * kcalPerSec);
+                        int totalCal = (int) (totalSeconds * kcalPerSec);
                         if (tvCalories != null) tvCalories.setText(String.valueOf(totalCal));
                     }
-                    seconds++;
-                    handler.postDelayed(this, 1000);
+
+                    handler.postDelayed(this, 10); // 10ms 间隔 (用于平滑刷新)
                 }
             }
         });
     }
 
     private String formatPace(double paceValue) {
-        if (paceValue > 99) return "--:--";
-        int paceMin = (int) paceValue;
-        int paceSec = (int) ((paceValue - paceMin) * 60);
-        return String.format(Locale.getDefault(), "%d:%02d", paceMin, paceSec);
+        return String.format(Locale.getDefault(), "%.1f", paceValue);
     }
 
     private void saveWorkoutData() {
+        long finalSeconds = totalTimeMillis / 1000;
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
             String currentDate = "TODAY - " + sdf.format(new Date());
-            String durationStr = (seconds < 60) ? seconds + " secs" : (seconds / 60) + " mins";
+            String durationStr = (finalSeconds < 60) ? finalSeconds + " secs" : (finalSeconds / 60) + " mins";
             String caloriesStr = (tvCalories != null ? tvCalories.getText().toString() : "0") + " kcal";
             Workout newWorkout = new Workout(currentType, durationStr, caloriesStr, currentDate);
+
             if (db != null) {
+                // 修复: 使用正确的 DAO 方法名 workoutDao()
                 db.workoutDao().insert(newWorkout);
+
                 Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
                 finish();
             }
