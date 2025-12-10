@@ -35,11 +35,11 @@ public class WriteDiaryActivity extends AppCompatActivity {
         if (user != null) {
             // [正常情况] 用户已登录 -> 存入 Users/UID/Diaries
             String uid = user.getUid();
-            String dbUrl = "https://stay-healthy-ad450-default-rtdb.asia-southeast1.firebasedatabase.app"; // 注意：一定要去网页复制准确的
+            String dbUrl = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/"; // 注意：一定要去网页复制准确的
             mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("Users").child(uid).child("Diaries");
         } else {
             // [异常情况] 用户未登录 -> 提示并存入 DebugDiaries 防止闪退
-            Toast.makeText(this, "⚠️ Alert: Not logged in! Saving to Debug Mode.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Alert: Not logged in! Saving to Debug Mode.", Toast.LENGTH_LONG).show();
             mDatabase = FirebaseDatabase.getInstance().getReference("DebugDiaries");
         }
 
@@ -71,7 +71,7 @@ public class WriteDiaryActivity extends AppCompatActivity {
         // 创建对象
         DiaryEntry entry = new DiaryEntry(content, fullDate, year, month);
         if (mDatabase == null) {
-            android.util.Log.e("DEBUG_DIARY", "致命错误：mDatabase 是 null！");
+            android.util.Log.e("DEBUG_DIARY", "error：mDatabase is null！");
             Toast.makeText(this, "Database Error", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -80,7 +80,7 @@ public class WriteDiaryActivity extends AppCompatActivity {
         // 这里的 mDatabase 已经在 onCreate 里确定好是存哪了
         mDatabase.push().setValue(entry)
                 .addOnSuccessListener(v -> {
-                    Toast.makeText(this, "Saved to Cloud! ☁️", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Saved to Cloud!", Toast.LENGTH_SHORT).show();
                     finish();
                 })
                 .addOnFailureListener(e -> {

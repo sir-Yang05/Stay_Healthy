@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseAuthInvalidUserException;
 
 import java.util.regex.Matcher;
@@ -68,9 +69,15 @@ public class LoginActivity extends AppCompatActivity {
                         startActivity(new Intent(LoginActivity.this, MainPage.class));
                         finish();
                     } else {
-                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Unknown error.";
-                        Toast.makeText(this, "Authentication failed: " + errorMessage,
-                                Toast.LENGTH_LONG).show();
+                        Exception exception = task.getException();
+                        if (exception instanceof FirebaseAuthInvalidUserException) {
+                            Toast.makeText(LoginActivity.this, "Account not registered.", Toast.LENGTH_LONG).show();
+                        } else if (exception instanceof FirebaseAuthInvalidCredentialsException) {
+                            Toast.makeText(LoginActivity.this, "Invalid password.", Toast.LENGTH_LONG).show();
+                        } else {
+                            String errorMessage = exception != null ? exception.getMessage() : "Unknown error.";
+                            Toast.makeText(LoginActivity.this, "Authentication failed: " + errorMessage, Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
     }
