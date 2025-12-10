@@ -3,6 +3,7 @@ import org.gradle.kotlin.dsl.implementation
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
+
 }
 
 android {
@@ -43,7 +44,7 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
     implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-database:20.3.1")
+
     
     // AndroidX Libraries from libs.versions.toml
     implementation(libs.appcompat)
@@ -54,6 +55,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-firestore")
     // Testing
 
     testImplementation(libs.junit)

@@ -1,4 +1,4 @@
-package com.example.stay_healthy;
+package com.example.stay_healthy; // ⚠️ 确认包名
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -34,10 +34,15 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -138,41 +143,36 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         btnCollapse.setOnClickListener(v -> togglePanel());
 
-        // 确保初始状态正确：running=true, 显示PAUSE, 灰色背景
+        // 确保初始状态正确
         running = true;
         btnPauseResume.setText("PAUSE");
         btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
         btnPauseResume.setTextColor(COLOR_WHITE);
-        // 初始化时，记录计时起始时间
         startTimeMillis = System.currentTimeMillis();
 
-        // DONE 按钮逻辑 (停止并保存)
+        // DONE 按钮逻辑
         btnDone.setOnClickListener(v -> {
             running = false;
             stopLocationUpdates();
             saveWorkoutData();
         });
 
-        // PAUSE/RESUME 按钮逻辑 (使用系统时间)
+        // PAUSE/RESUME 按钮逻辑
         btnPauseResume.setOnClickListener(v -> {
             if (running) {
-                // 当前正在运行 -> 暂停
                 running = false;
                 stopLocationUpdates();
                 btnPauseResume.setText("RESUME");
                 btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
                 btnPauseResume.setTextColor(COLOR_BLACK);
 
-                // 暂停时：将已用时间保存到 totalTimeMillis，并重置 startTimeMillis
                 totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
                 startTimeMillis = 0;
             } else {
-                // 当前已暂停 -> 继续
                 running = true;
                 startLocationUpdates();
-                // 重新设置起始时间 = 当前系统时间 - 已用时间
                 startTimeMillis = System.currentTimeMillis() - totalTimeMillis;
-                runTimer(); // 重新启动计时器循环
+                runTimer();
                 btnPauseResume.setText("PAUSE");
                 btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
                 btnPauseResume.setTextColor(COLOR_WHITE);
@@ -182,9 +182,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void togglePanel() {
         if (collapsibleContent == null || layoutTabs == null || btnCollapse == null || bottomPanel == null) return;
-
         TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
-
         if (collapsibleContent.getVisibility() == View.VISIBLE) {
             collapsibleContent.setVisibility(View.GONE);
             layoutTabs.setVisibility(View.GONE);
@@ -193,7 +191,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             collapsibleContent.setVisibility(View.VISIBLE);
             layoutTabs.setVisibility(View.VISIBLE);
             btnCollapse.setRotation(90);
-
             if(viewSummary.getVisibility() == View.GONE && viewBreakdown.getVisibility() == View.GONE) {
                 viewSummary.setVisibility(View.VISIBLE);
             }
@@ -202,7 +199,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void setupTabs() {
         if (tabSummary == null || tabBreakdown == null || bottomPanel == null) return;
-
         tabSummary.setOnClickListener(v -> {
             tabSummary.setTextColor(0xFFC0FF00);
             tabBreakdown.setTextColor(Color.GRAY);
@@ -210,7 +206,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             if (viewSummary != null) viewSummary.setVisibility(View.VISIBLE);
             if (viewBreakdown != null) viewBreakdown.setVisibility(View.GONE);
         });
-
         tabBreakdown.setOnClickListener(v -> {
             tabBreakdown.setTextColor(0xFFC0FF00);
             tabSummary.setTextColor(Color.GRAY);
@@ -225,24 +220,20 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, 20, 0, 20);
-
         TextView tvKm = new TextView(this);
         tvKm.setText(kmIndex + " km");
         tvKm.setTextColor(Color.WHITE);
         tvKm.setTextSize(16);
         row.addView(tvKm);
-
         TextView tvTime = new TextView(this);
         tvTime.setText(paceTime);
         tvTime.setTextColor(0xFFC0FF00);
         tvTime.setTextSize(16);
         tvTime.setGravity(Gravity.END);
         row.addView(tvTime);
-
         layoutSplitsContainer.addView(row, 0);
     }
 
-    // --- 地图与定位 ---
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
@@ -270,7 +261,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private void startLocationUpdates() {
         LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
                 .setMinUpdateIntervalMillis(2000).build();
-
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
@@ -284,40 +274,31 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 }
             }
         };
-
         if (running && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
         }
     }
 
-    // 核心计时器和数据更新
     private void updateDistanceAndSpeed(Location currentLocation) {
-        // totalSeconds 依赖于 totalTimeMillis 的计算
         long totalSeconds = totalTimeMillis / 1000;
-
         if (lastLocation != null) {
             float distanceMeters = currentLocation.distanceTo(lastLocation);
             if (distanceMeters > 2) totalDistance += (distanceMeters / 1000.0);
         }
         lastLocation = currentLocation;
 
-        // --- 分段数据 ---
         int currentKmInt = (int) totalDistance;
         if (currentKmInt > lastKmInt && totalSeconds > lastKmSeconds) {
             int secondsForThisKm = (int) totalSeconds - lastKmSeconds;
             lastKmSeconds = (int) totalSeconds;
             lastKmInt = currentKmInt;
-
-            // 记录时，使用 min:ss 格式 (Breakdown)
             int pMin = secondsForThisKm / 60;
             int pSec = secondsForThisKm % 60;
             String paceTime = String.format(Locale.getDefault(), "%d:%02d", pMin, pSec);
             addSplitRow(currentKmInt, paceTime);
         }
 
-        // --- 实时速度/配速 (s/m 和 m/s) ---
-        double speedMs = currentLocation.getSpeed();
-
+        float speedMs = currentLocation.getSpeed();
         if (speedMs > 0.1) {
             double paceValueSM = 1.0 / speedMs;
             if (tvPace != null) tvPace.setText(String.format(Locale.getDefault(), "%.1f", paceValueSM));
@@ -325,7 +306,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             if (tvPace != null) tvPace.setText("0.0");
         }
 
-        // --- 更新距离和卡路里 ---
         if (tvDistance != null) tvDistance.setText(String.format(Locale.getDefault(), "%.2f", totalDistance));
         double calFactor = 60.0;
         if (currentType.equals("Cycling")) calFactor = 25.0;
@@ -333,13 +313,10 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         int calories = (int) (totalDistance * calFactor);
         if (tvCalories != null) tvCalories.setText(String.valueOf(calories));
 
-        // --- 平均速度/配速 (m/s 和 s/m) ---
         if (totalSeconds > 0) {
             double avgSpeedKmh = totalDistance / (totalSeconds / 3600.0);
             double avgSpeedMs = avgSpeedKmh / 3.6;
-
             if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeedMs));
-
             if (avgSpeedMs > 0.1) {
                 double avgPaceSM = 1.0 / avgSpeedMs;
                 if (tvAvgPace != null) tvAvgPace.setText(String.format(Locale.getDefault(), "%.1f", avgPaceSM));
@@ -365,7 +342,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void setupUIForSport(String type) {
         if (isBallSport(type)) {
-            // 球类运动隐藏距离和配速相关数据
             if (tvDistance != null && ((View)tvDistance.getParent()).getVisibility() != View.GONE) ((View)tvDistance.getParent()).setVisibility(View.GONE);
             if (tvPace != null && ((View)tvPace.getParent()).getVisibility() != View.GONE) ((View)tvPace.getParent()).setVisibility(View.GONE);
             if (rowStats2 != null) rowStats2.setVisibility(View.GONE);
@@ -377,44 +353,34 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         return type.equals("Basketball") || type.equals("Badminton");
     }
 
-    // 核心计时器逻辑 (基于系统时间)
     private void runTimer() {
         if (!running) return;
-
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             @Override
             public void run() {
                 if (running) {
-                    // 1. 基于当前系统时间计算流逝的总时间
                     long currentTime = System.currentTimeMillis();
                     totalTimeMillis = currentTime - startTimeMillis;
-
                     long totalSeconds = totalTimeMillis / 1000;
 
-                    // 2. 时间分解
                     int hours = (int) totalSeconds / 3600;
                     int minutes = (int) (totalSeconds % 3600) / 60;
                     int secs = (int) totalSeconds % 60;
-                    // 计算两位数的毫秒 (00-99)
                     int ms = (int) (totalTimeMillis % 1000) / 10;
 
-                    // ⚠️ 格式化时间：主计时器移除秒后的分隔符
                     String time = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
-                    // 🟢 毫秒格式：前面添加冒号 (使用小字体 20sp)
                     String msString = String.format(Locale.getDefault(), ".%02d", ms);
 
                     if (tvTimerMain != null) tvTimerMain.setText(time);
                     if (tvMilliseconds != null) tvMilliseconds.setText(msString);
 
-                    // 运动消耗 (球类依然按时间计算)
                     if (isBallSport(currentType)) {
                         double kcalPerSec = (currentType.equals("Basketball")) ? 0.13 : 0.1;
                         int totalCal = (int) (totalSeconds * kcalPerSec);
                         if (tvCalories != null) tvCalories.setText(String.valueOf(totalCal));
                     }
-
-                    handler.postDelayed(this, 10); // 10ms 间隔 (用于平滑刷新)
+                    handler.postDelayed(this, 10);
                 }
             }
         });
@@ -424,6 +390,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         return String.format(Locale.getDefault(), "%.1f", paceValue);
     }
 
+    // 🟢 核心修改：保存到 Firebase (云端) + Room (本地)
     private void saveWorkoutData() {
         long finalSeconds = totalTimeMillis / 1000;
         try {
@@ -431,15 +398,37 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             String currentDate = "TODAY - " + sdf.format(new Date());
             String durationStr = (finalSeconds < 60) ? finalSeconds + " secs" : (finalSeconds / 60) + " mins";
             String caloriesStr = (tvCalories != null ? tvCalories.getText().toString() : "0") + " kcal";
+
+            // 1. 本地保存
             Workout newWorkout = new Workout(currentType, durationStr, caloriesStr, currentDate);
+            if (db != null) db.workoutDao().insert(newWorkout);
 
-            if (db != null) {
-                // 修复: 使用正确的 DAO 方法名 workoutDao()
-                db.workoutDao().insert(newWorkout);
+            // 2. 🟢 云端保存 (Firebase)
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user != null) {
+                Map<String, Object> workoutMap = new HashMap<>();
+                workoutMap.put("type", currentType);
+                workoutMap.put("duration", durationStr);
+                workoutMap.put("calories", caloriesStr);
+                workoutMap.put("date", currentDate);
+                workoutMap.put("timestamp", System.currentTimeMillis());
 
-                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
-                finish();
+                FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(user.getUid())
+                        .collection("workouts")
+                        .add(workoutMap)
+                        .addOnSuccessListener(documentReference -> {
+                            Toast.makeText(this, "Saved to Cloud!", Toast.LENGTH_SHORT).show();
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(this, "Cloud Sync Failed", Toast.LENGTH_SHORT).show();
+                        });
             }
+
+            Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
+            finish();
+
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "543647916456",
-    "project_id": "stay-healthy-ad450",
-    "storage_bucket": "stay-healthy-ad450.firebasestorage.app"
+    "project_number": "221436497660",
+    "project_id": "stay-healthy-6d8ff",
+    "storage_bucket": "stay-healthy-6d8ff.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:543647916456:android:920d6499713be2371fbd9d",
+        "mobilesdk_app_id": "1:221436497660:android:815b41479fae371f1b9179",
         "android_client_info": {
           "package_name": "com.example.stay_healthy"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDHzZ9IObfaCbdBWV5MUoeTundeUG9lFso"
+          "current_key": "AIzaSyADdDZKRvQGKjDcK2oInuNVuaNAJn-LdLE"
         }
       ],
       "services": {
