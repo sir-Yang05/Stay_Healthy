@@ -8,27 +8,26 @@
         android:id="@+id/top_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="15dp"
-        android:background="@color/light_blue">
+        android:background="@color/light_blue"
+        android:padding="15dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Diary History"
             android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_centerInParent="true"/>
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btn_manage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:padding="5dp"
             android:text="Manage"
             android:textColor="#2196F3"
             android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_alignParentEnd="true"
-            android:padding="5dp"/>
+            android:textStyle="bold" />
     </RelativeLayout>
 
     <LinearLayout

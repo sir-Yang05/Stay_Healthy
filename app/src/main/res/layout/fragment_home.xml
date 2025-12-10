@@ -7,17 +7,18 @@
     android:background="@color/app_background"
     android:padding="20dp">
 
+
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="Track Workout"
         android:textColor="@color/text_primary"
         android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
 
     <LinearLayout
         android:id="@+id/layout_top_cards"
