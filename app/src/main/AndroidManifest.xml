@@ -5,15 +5,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-
 
     <application
         android:name=".MyApplication"
@@ -34,28 +30,45 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.App.NoActionBar.Fullscreen" >
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <activity android:name=".LoginActivity" android:exported="false"
+        <activity android:name=".LoginActivity"
+            android:exported="false"
             android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
-        <activity
-            android:name=".RegisterActivity"
+
+        <activity android:name=".RegisterActivity"
             android:exported="false"
             android:theme="@style/Theme.Stay_Healthy.NoActionBar" />
 
-        <activity android:name=".MainPage" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+        <activity android:name=".MainPage"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
 
-        <activity android:name=".HistoryDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".DiaryDetailActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".WriteDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-        <activity android:name=".EditProfileActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
+        <activity android:name=".HistoryDiaryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
 
-        <activity android:name=".RunningActivity" android:exported="false" />
+        <activity android:name=".DiaryDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
+
+        <activity android:name=".WriteDiaryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
+
+        <activity android:name=".EditProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
+
+        <activity android:name=".RunningActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Stay_Healthy.NoActionBar"/>
+
     </application>
 
 </manifest>
