@@ -53,7 +53,7 @@
         <activity android:name=".HistoryDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".DiaryDetailActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
         <activity android:name=".WriteDiaryActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
-
+        <activity android:name=".EditProfileActivity" android:exported="false" android:theme="@style/Theme.App.NoActionBar.Fullscreen"/>
 
         <activity android:name=".RunningActivity" android:exported="false" />
     </application>
