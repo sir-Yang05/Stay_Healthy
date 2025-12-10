@@ -51,7 +51,7 @@ public class EditProfileActivity extends AppCompatActivity {
     private String newProfileImageBase64 = null;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
 
-    private static final String DB_URL = "https://stay-healthy-ad450-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    private static final String DB_URL = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
