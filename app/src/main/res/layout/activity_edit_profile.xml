@@ -8,14 +8,17 @@
     tools:context=".EditProfileActivity">
 
     <!-- Toolbar for Back button and Save (since Save is now a button in the content, we skip toolbar title) -->
+
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
+        android:layout_marginTop="16dp"
         android:background="#FFFFFF"
         app:layout_constraintTop_toTopOf="parent"
         app:title="Edit Profile"
-        app:titleTextColor="@android:color/black" />
+        app:titleTextColor="@android:color/black"
+        tools:layout_editor_absoluteX="0dp" />
 
     <ScrollView
         android:layout_width="0dp"

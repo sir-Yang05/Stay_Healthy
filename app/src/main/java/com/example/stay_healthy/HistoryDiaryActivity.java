@@ -69,7 +69,7 @@ public class HistoryDiaryActivity extends AppCompatActivity {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
             String uid = user.getUid();
-            String dbUrl = "https://stay-healthy-ad450-default-rtdb.asia-southeast1.firebasedatabase.app"; // 注意：一定要去网页复制准确的
+            String dbUrl = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/"; // 注意：一定要去网页复制准确的
             mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("Users").child(uid).child("Diaries");
         } else {
             // 没登录测试用
