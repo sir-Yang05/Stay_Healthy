@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="map_split_ratio" type="dimen" format="float">0.65</item>
+
+    <dimen name="running_btn_height">35dp</dimen>
+    <dimen name="running_btn_text">12sp</dimen>
+    <dimen name="panel_padding_top">4dp</dimen>
+</resources>

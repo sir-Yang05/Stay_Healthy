@@ -1,4 +1,4 @@
-package com.example.stay_healthy; // ⚠️ 确认包名
+package com.example.stay_healthy;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -47,12 +47,10 @@ import java.util.Map;
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private AppDatabase db;
-    // 存储已用时间 (暂停时保存)
     private long totalTimeMillis = 0;
-    // 记录计时开始时的系统时间戳 (用于精确计算)
     private long startTimeMillis = 0;
 
-    private boolean running = true;
+    private boolean running = false;
     private String currentType = "Running";
     private double totalDistance = 0.0;
     private Location lastLocation;
@@ -63,15 +61,17 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private TextView tvTimerMain, tvMilliseconds;
     private TextView tvCalories, tvDistance, tvPace, tvAvgPace, tvAvgSpeed;
     private LinearLayout rowStats2;
-    private TextView tvPageTitle;
+
     private TextView tabSummary, tabBreakdown;
     private View viewSummary, viewBreakdown;
     private LinearLayout layoutSplitsContainer;
+    private TextView tvEmptySplits;
+
     private Button btnDone;
     private Button btnPauseResume;
-    private ImageView btnCollapse;
-    private LinearLayout layoutTabs;
-    private LinearLayout collapsibleContent;
+    private Button btnReset;
+    // ❌ 已删除 btnCollapse
+    private LinearLayout layoutButtons;
     private View bottomPanel;
 
     // Map Variables
@@ -80,7 +80,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private LocationCallback locationCallback;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
 
-    // 颜色常量
     private final int COLOR_GRAY = Color.parseColor("#808080");
     private final int COLOR_WHITE = Color.parseColor("#FFFFFF");
     private final int COLOR_BLACK = Color.parseColor("#000000");
@@ -104,14 +103,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         if (mapFragment != null) mapFragment.getMapAsync(this);
-
-        runTimer();
     }
 
     private void initViews() {
-        tvPageTitle = findViewById(R.id.tv_page_title);
-        if (tvPageTitle != null) tvPageTitle.setVisibility(View.GONE);
-
         ImageView btnBack = findViewById(R.id.btn_back_run);
 
         tvTimerMain = findViewById(R.id.tv_timer_main);
@@ -119,6 +113,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         btnDone = findViewById(R.id.btn_stop);
         btnPauseResume = findViewById(R.id.btn_pause_resume);
+        btnReset = findViewById(R.id.btn_reset);
+        layoutButtons = findViewById(R.id.layout_buttons);
 
         tvCalories = findViewById(R.id.tv_calories_run);
         tvDistance = findViewById(R.id.tv_distance);
@@ -132,68 +128,116 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         viewSummary = findViewById(R.id.view_summary);
         viewBreakdown = findViewById(R.id.view_breakdown);
         layoutSplitsContainer = findViewById(R.id.layout_splits_container);
+        tvEmptySplits = findViewById(R.id.tv_empty_splits);
 
-        layoutTabs = findViewById(R.id.layout_tabs);
-        collapsibleContent = findViewById(R.id.collapsible_content);
-
-        btnCollapse = findViewById(R.id.btn_collapse);
         bottomPanel = findViewById(R.id.bottom_panel);
 
         btnBack.setOnClickListener(v -> finish());
 
-        btnCollapse.setOnClickListener(v -> togglePanel());
+        // ❌ 已删除折叠监听器
 
-        // 确保初始状态正确
-        running = true;
-        btnPauseResume.setText("PAUSE");
-        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
-        btnPauseResume.setTextColor(COLOR_WHITE);
-        startTimeMillis = System.currentTimeMillis();
+        // 初始状态
+        running = false;
+        btnPauseResume.setText("START");
+        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_green));
+        btnPauseResume.setTextColor(COLOR_BLACK);
+        btnDone.setVisibility(View.GONE);
+        btnReset.setVisibility(View.GONE);
 
-        // DONE 按钮逻辑
         btnDone.setOnClickListener(v -> {
             running = false;
             stopLocationUpdates();
             saveWorkoutData();
         });
 
-        // PAUSE/RESUME 按钮逻辑
-        btnPauseResume.setOnClickListener(v -> {
-            if (running) {
-                running = false;
-                stopLocationUpdates();
-                btnPauseResume.setText("RESUME");
-                btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
-                btnPauseResume.setTextColor(COLOR_BLACK);
+        btnReset.setOnClickListener(v -> resetWorkout());
 
-                totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
-                startTimeMillis = 0;
+        btnPauseResume.setOnClickListener(v -> {
+            String state = btnPauseResume.getText().toString();
+            if (state.equals("START")) {
+                startWorkout();
+            } else if (state.equals("PAUSE")) {
+                pauseWorkout();
             } else {
-                running = true;
-                startLocationUpdates();
-                startTimeMillis = System.currentTimeMillis() - totalTimeMillis;
-                runTimer();
-                btnPauseResume.setText("PAUSE");
-                btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
-                btnPauseResume.setTextColor(COLOR_WHITE);
+                resumeWorkout();
             }
         });
     }
 
-    private void togglePanel() {
-        if (collapsibleContent == null || layoutTabs == null || btnCollapse == null || bottomPanel == null) return;
-        TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
-        if (collapsibleContent.getVisibility() == View.VISIBLE) {
-            collapsibleContent.setVisibility(View.GONE);
-            layoutTabs.setVisibility(View.GONE);
-            btnCollapse.setRotation(270);
+    private void startWorkout() {
+        running = true;
+        startTimeMillis = System.currentTimeMillis();
+        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
+        btnPauseResume.setText("PAUSE");
+        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
+        btnPauseResume.setTextColor(COLOR_WHITE);
+        btnDone.setVisibility(View.VISIBLE);
+        btnReset.setVisibility(View.GONE);
+        startLocationUpdates();
+        runTimer();
+    }
+
+    private void pauseWorkout() {
+        running = false;
+        stopLocationUpdates();
+        totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
+        startTimeMillis = 0;
+        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
+        btnPauseResume.setText("RESUME");
+        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
+        btnPauseResume.setTextColor(COLOR_BLACK);
+        btnReset.setVisibility(View.VISIBLE);
+    }
+
+    private void resumeWorkout() {
+        running = true;
+        startTimeMillis = System.currentTimeMillis() - totalTimeMillis;
+        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
+        btnPauseResume.setText("PAUSE");
+        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
+        btnPauseResume.setTextColor(COLOR_WHITE);
+        btnReset.setVisibility(View.GONE);
+        startLocationUpdates();
+        runTimer();
+    }
+
+    private void resetWorkout() {
+        running = false;
+        stopLocationUpdates();
+        totalTimeMillis = 0;
+        startTimeMillis = 0;
+        totalDistance = 0.0;
+        lastLocation = null;
+        lastKmSeconds = 0;
+        lastKmInt = 0;
+        tvTimerMain.setText("00:00:00");
+        tvMilliseconds.setText(".00");
+        if (tvDistance != null) tvDistance.setText("0.00");
+        if (tvCalories != null) tvCalories.setText("0");
+        if (tvPace != null) tvPace.setText("0.0");
+
+        if (layoutSplitsContainer != null) layoutSplitsContainer.removeAllViews();
+        if (tvEmptySplits != null) tvEmptySplits.setVisibility(View.VISIBLE);
+
+        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
+        btnPauseResume.setText("START");
+        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_green));
+        btnPauseResume.setTextColor(COLOR_BLACK);
+        btnDone.setVisibility(View.GONE);
+        btnReset.setVisibility(View.GONE);
+
+        if(viewSummary.getVisibility() == View.GONE) toggleBreakdownView();
+
+        Toast.makeText(this, "Reset", Toast.LENGTH_SHORT).show();
+    }
+
+    private void toggleBreakdownView() {
+        if (viewSummary.getVisibility() == View.VISIBLE) {
+            viewSummary.setVisibility(View.GONE);
+            viewBreakdown.setVisibility(View.VISIBLE);
         } else {
-            collapsibleContent.setVisibility(View.VISIBLE);
-            layoutTabs.setVisibility(View.VISIBLE);
-            btnCollapse.setRotation(90);
-            if(viewSummary.getVisibility() == View.GONE && viewBreakdown.getVisibility() == View.GONE) {
-                viewSummary.setVisibility(View.VISIBLE);
-            }
+            viewSummary.setVisibility(View.VISIBLE);
+            viewBreakdown.setVisibility(View.GONE);
         }
     }
 
@@ -202,6 +246,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tabSummary.setOnClickListener(v -> {
             tabSummary.setTextColor(0xFFC0FF00);
             tabBreakdown.setTextColor(Color.GRAY);
+            // 这里用 bottomPanel 做动画容器，让内容切换更丝滑
             TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
             if (viewSummary != null) viewSummary.setVisibility(View.VISIBLE);
             if (viewBreakdown != null) viewBreakdown.setVisibility(View.GONE);
@@ -217,6 +262,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void addSplitRow(int kmIndex, String paceTime) {
         if (layoutSplitsContainer == null) return;
+        if (tvEmptySplits != null && tvEmptySplits.getVisibility() == View.VISIBLE) tvEmptySplits.setVisibility(View.GONE);
+
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, 20, 0, 20);
@@ -253,7 +300,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             if (mMap != null) {
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
-                startLocationUpdates();
             }
         } catch (SecurityException e) { e.printStackTrace(); }
     }
@@ -281,6 +327,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void updateDistanceAndSpeed(Location currentLocation) {
         long totalSeconds = totalTimeMillis / 1000;
+
         if (lastLocation != null) {
             float distanceMeters = currentLocation.distanceTo(lastLocation);
             if (distanceMeters > 2) totalDistance += (distanceMeters / 1000.0);
@@ -390,7 +437,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         return String.format(Locale.getDefault(), "%.1f", paceValue);
     }
 
-    // 🟢 核心修改：保存到 Firebase (云端) + Room (本地)
     private void saveWorkoutData() {
         long finalSeconds = totalTimeMillis / 1000;
         try {
@@ -399,11 +445,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             String durationStr = (finalSeconds < 60) ? finalSeconds + " secs" : (finalSeconds / 60) + " mins";
             String caloriesStr = (tvCalories != null ? tvCalories.getText().toString() : "0") + " kcal";
 
-            // 1. 本地保存
             Workout newWorkout = new Workout(currentType, durationStr, caloriesStr, currentDate);
             if (db != null) db.workoutDao().insert(newWorkout);
 
-            // 2. 🟢 云端保存 (Firebase)
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
             if (user != null) {
                 Map<String, Object> workoutMap = new HashMap<>();
@@ -417,18 +461,11 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                         .collection("users")
                         .document(user.getUid())
                         .collection("workouts")
-                        .add(workoutMap)
-                        .addOnSuccessListener(documentReference -> {
-                            Toast.makeText(this, "Saved to Cloud!", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e -> {
-                            Toast.makeText(this, "Cloud Sync Failed", Toast.LENGTH_SHORT).show();
-                        });
+                        .add(workoutMap);
             }
 
             Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
             finish();
-
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
