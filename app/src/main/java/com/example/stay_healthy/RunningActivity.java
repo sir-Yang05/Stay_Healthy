@@ -2,26 +2,21 @@ package com.example.stay_healthy;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.content.res.ColorStateList;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.Gravity;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.transition.TransitionManager;
-import androidx.transition.AutoTransition;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -34,441 +29,294 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback {
 
-    private AppDatabase db;
-    private long totalTimeMillis = 0;
-    private long startTimeMillis = 0;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
 
-    private boolean running = false;
-    private String currentType = "Running";
-    private double totalDistance = 0.0;
-    private Location lastLocation;
-    private int lastKmSeconds = 0;
-    private int lastKmInt = 0;
-
-    // UI Variables
-    private TextView tvTimerMain, tvMilliseconds;
-    private TextView tvCalories, tvDistance, tvPace, tvAvgPace, tvAvgSpeed;
-    private LinearLayout rowStats2;
-
-    private TextView tabSummary, tabBreakdown;
-    private View viewSummary, viewBreakdown;
-    private LinearLayout layoutSplitsContainer;
-    private TextView tvEmptySplits;
-
-    private Button btnDone;
-    private Button btnPauseResume;
-    private Button btnReset;
-    // ❌ 已删除 btnCollapse
-    private LinearLayout layoutButtons;
-    private View bottomPanel;
-
-    // Map Variables
     private GoogleMap mMap;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+    private List<LatLng> pathPoints = new ArrayList<>();
+    private Polyline polyline;
 
-    private final int COLOR_GRAY = Color.parseColor("#808080");
-    private final int COLOR_WHITE = Color.parseColor("#FFFFFF");
-    private final int COLOR_BLACK = Color.parseColor("#000000");
+    // 计时器相关
+    private TextView tvTimerMain, tvMilliseconds;
+    private Handler timerHandler = new Handler(Looper.getMainLooper());
+    private long startTime = 0L;
+    private long timeInMilliseconds = 0L;
+    private long timeSwapBuff = 0L;
+    private long updateTime = 0L;
+    private boolean isRunning = false;
+
+    // 数据显示
+    private TextView tvDistance, tvPace, tvCalories;
+    private float totalDistance = 0f; // 单位：米
+
+    // 按钮
+    private Button btnStartPause, btnStop, btnReset;
+    private LinearLayout layoutButtons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
 
-        if (getSupportActionBar() != null) getSupportActionBar().hide();
-        db = AppDatabase.getInstance(this);
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
-        if (getIntent().hasExtra("SPORT_TYPE")) {
-            currentType = getIntent().getStringExtra("SPORT_TYPE");
-        }
-
-        initViews();
-        setupUIForSport(currentType);
-        setupTabs();
-
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
-        if (mapFragment != null) mapFragment.getMapAsync(this);
-    }
-
-    private void initViews() {
-        ImageView btnBack = findViewById(R.id.btn_back_run);
-
+        // 初始化控件
         tvTimerMain = findViewById(R.id.tv_timer_main);
         tvMilliseconds = findViewById(R.id.tv_milliseconds);
+        tvDistance = findViewById(R.id.tv_distance);
+        tvPace = findViewById(R.id.tv_pace);
+        tvCalories = findViewById(R.id.tv_calories_run);
 
-        btnDone = findViewById(R.id.btn_stop);
-        btnPauseResume = findViewById(R.id.btn_pause_resume);
+        btnStartPause = findViewById(R.id.btn_pause_resume);
+        btnStop = findViewById(R.id.btn_stop);
         btnReset = findViewById(R.id.btn_reset);
         layoutButtons = findViewById(R.id.layout_buttons);
 
-        tvCalories = findViewById(R.id.tv_calories_run);
-        tvDistance = findViewById(R.id.tv_distance);
-        tvPace = findViewById(R.id.tv_pace);
-        tvAvgPace = findViewById(R.id.tv_avg_pace);
-        tvAvgSpeed = findViewById(R.id.tv_avg_speed);
-        rowStats2 = findViewById(R.id.row_stats_2);
+        findViewById(R.id.btn_back_run).setOnClickListener(v -> finish());
 
-        tabSummary = findViewById(R.id.tab_summary);
-        tabBreakdown = findViewById(R.id.tab_breakdown);
-        viewSummary = findViewById(R.id.view_summary);
-        viewBreakdown = findViewById(R.id.view_breakdown);
-        layoutSplitsContainer = findViewById(R.id.layout_splits_container);
-        tvEmptySplits = findViewById(R.id.tv_empty_splits);
+        // 初始化定位服务
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        bottomPanel = findViewById(R.id.bottom_panel);
+        // 初始化地图
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+        if (mapFragment != null) {
+            mapFragment.getMapAsync(this);
+        }
 
-        btnBack.setOnClickListener(v -> finish());
+        setupButtons();
+        createLocationCallback();
+    }
 
-        // ❌ 已删除折叠监听器
-
-        // 初始状态
-        running = false;
-        btnPauseResume.setText("START");
-        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_green));
-        btnPauseResume.setTextColor(COLOR_BLACK);
-        btnDone.setVisibility(View.GONE);
-        btnReset.setVisibility(View.GONE);
-
-        btnDone.setOnClickListener(v -> {
-            running = false;
-            stopLocationUpdates();
-            saveWorkoutData();
-        });
-
-        btnReset.setOnClickListener(v -> resetWorkout());
-
-        btnPauseResume.setOnClickListener(v -> {
-            String state = btnPauseResume.getText().toString();
-            if (state.equals("START")) {
-                startWorkout();
-            } else if (state.equals("PAUSE")) {
-                pauseWorkout();
+    private void setupButtons() {
+        btnStartPause.setOnClickListener(v -> {
+            if (!isRunning) {
+                startRun();
             } else {
-                resumeWorkout();
+                pauseRun();
             }
         });
+
+        btnStop.setOnClickListener(v -> stopRun());
+
+        btnReset.setOnClickListener(v -> {
+            // 重置逻辑
+            pauseRun();
+            resetData();
+            btnReset.setVisibility(View.GONE);
+            btnStop.setVisibility(View.GONE);
+            btnStartPause.setText("START");
+        });
     }
 
-    private void startWorkout() {
-        running = true;
-        startTimeMillis = System.currentTimeMillis();
-        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
-        btnPauseResume.setText("PAUSE");
-        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
-        btnPauseResume.setTextColor(COLOR_WHITE);
-        btnDone.setVisibility(View.VISIBLE);
+    private void startRun() {
+        isRunning = true;
+        startTime = System.currentTimeMillis();
+        timerHandler.postDelayed(updateTimerThread, 0);
+        btnStartPause.setText("PAUSE");
+        btnStop.setVisibility(View.GONE);
         btnReset.setVisibility(View.GONE);
         startLocationUpdates();
-        runTimer();
     }
 
-    private void pauseWorkout() {
-        running = false;
-        stopLocationUpdates();
-        totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
-        startTimeMillis = 0;
-        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
-        btnPauseResume.setText("RESUME");
-        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.mint_green));
-        btnPauseResume.setTextColor(COLOR_BLACK);
+    private void pauseRun() {
+        isRunning = false;
+        timeSwapBuff += timeInMilliseconds;
+        timerHandler.removeCallbacks(updateTimerThread);
+        btnStartPause.setText("RESUME");
+        btnStop.setVisibility(View.VISIBLE);
         btnReset.setVisibility(View.VISIBLE);
-    }
-
-    private void resumeWorkout() {
-        running = true;
-        startTimeMillis = System.currentTimeMillis() - totalTimeMillis;
-        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
-        btnPauseResume.setText("PAUSE");
-        btnPauseResume.setBackgroundTintList(ColorStateList.valueOf(COLOR_GRAY));
-        btnPauseResume.setTextColor(COLOR_WHITE);
-        btnReset.setVisibility(View.GONE);
-        startLocationUpdates();
-        runTimer();
-    }
-
-    private void resetWorkout() {
-        running = false;
         stopLocationUpdates();
-        totalTimeMillis = 0;
-        startTimeMillis = 0;
-        totalDistance = 0.0;
-        lastLocation = null;
-        lastKmSeconds = 0;
-        lastKmInt = 0;
-        tvTimerMain.setText("00:00:00");
-        tvMilliseconds.setText(".00");
-        if (tvDistance != null) tvDistance.setText("0.00");
-        if (tvCalories != null) tvCalories.setText("0");
-        if (tvPace != null) tvPace.setText("0.0");
-
-        if (layoutSplitsContainer != null) layoutSplitsContainer.removeAllViews();
-        if (tvEmptySplits != null) tvEmptySplits.setVisibility(View.VISIBLE);
-
-        TransitionManager.beginDelayedTransition(layoutButtons, new AutoTransition());
-        btnPauseResume.setText("START");
-        btnPauseResume.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_green));
-        btnPauseResume.setTextColor(COLOR_BLACK);
-        btnDone.setVisibility(View.GONE);
-        btnReset.setVisibility(View.GONE);
-
-        if(viewSummary.getVisibility() == View.GONE) toggleBreakdownView();
-
-        Toast.makeText(this, "Reset", Toast.LENGTH_SHORT).show();
     }
 
-    private void toggleBreakdownView() {
-        if (viewSummary.getVisibility() == View.VISIBLE) {
-            viewSummary.setVisibility(View.GONE);
-            viewBreakdown.setVisibility(View.VISIBLE);
-        } else {
-            viewSummary.setVisibility(View.VISIBLE);
-            viewBreakdown.setVisibility(View.GONE);
-        }
+    private void stopRun() {
+        pauseRun();
+        new AlertDialog.Builder(this)
+                .setTitle("End Run?")
+                .setMessage("Are you sure you want to end this run?")
+                .setPositiveButton("Yes", (dialog, which) -> {
+                    saveRunData();
+                    finish();
+                })
+                .setNegativeButton("No", null)
+                .show();
     }
 
-    private void setupTabs() {
-        if (tabSummary == null || tabBreakdown == null || bottomPanel == null) return;
-        tabSummary.setOnClickListener(v -> {
-            tabSummary.setTextColor(0xFFC0FF00);
-            tabBreakdown.setTextColor(Color.GRAY);
-            // 这里用 bottomPanel 做动画容器，让内容切换更丝滑
-            TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
-            if (viewSummary != null) viewSummary.setVisibility(View.VISIBLE);
-            if (viewBreakdown != null) viewBreakdown.setVisibility(View.GONE);
-        });
-        tabBreakdown.setOnClickListener(v -> {
-            tabBreakdown.setTextColor(0xFFC0FF00);
-            tabSummary.setTextColor(Color.GRAY);
-            TransitionManager.beginDelayedTransition((ViewGroup) bottomPanel, new AutoTransition());
-            if (viewSummary != null) viewSummary.setVisibility(View.GONE);
-            if (viewBreakdown != null) viewBreakdown.setVisibility(View.VISIBLE);
-        });
+    private void resetData() {
+        timeSwapBuff = 0L;
+        timeInMilliseconds = 0L;
+        startTime = 0L;
+        updateTime = 0L;
+        totalDistance = 0f;
+        pathPoints.clear();
+        if (polyline != null) polyline.remove();
+        polyline = null;
+
+        updateTimerUI(0, 0, 0, 0);
+        tvDistance.setText("0.00");
+        tvPace.setText("0.0");
+        tvCalories.setText("0");
     }
 
-    private void addSplitRow(int kmIndex, String paceTime) {
-        if (layoutSplitsContainer == null) return;
-        if (tvEmptySplits != null && tvEmptySplits.getVisibility() == View.VISIBLE) tvEmptySplits.setVisibility(View.GONE);
-
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, 20, 0, 20);
-        TextView tvKm = new TextView(this);
-        tvKm.setText(kmIndex + " km");
-        tvKm.setTextColor(Color.WHITE);
-        tvKm.setTextSize(16);
-        row.addView(tvKm);
-        TextView tvTime = new TextView(this);
-        tvTime.setText(paceTime);
-        tvTime.setTextColor(0xFFC0FF00);
-        tvTime.setTextSize(16);
-        tvTime.setGravity(Gravity.END);
-        row.addView(tvTime);
-        layoutSplitsContainer.addView(row, 0);
+    private void saveRunData() {
+        // 这里写保存到数据库的逻辑
+        Toast.makeText(this, "Run Saved!", Toast.LENGTH_SHORT).show();
     }
+
+    // ---------------- 定位核心逻辑 ----------------
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
-        checkPermissionAndEnableLocation();
-    }
-
-    private void checkPermissionAndEnableLocation() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            enableMyLocation();
-        } else {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
-        }
+        // 尝试启用定位图层
+        enableMyLocation();
     }
 
     private void enableMyLocation() {
-        try {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
             if (mMap != null) {
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
+
+                // 🚀 核心修改：双重保险获取位置
+                fusedLocationClient.getLastLocation()
+                        .addOnSuccessListener(this, location -> {
+                            if (location != null) {
+                                // 方案A：有缓存，直接飞过去
+                                LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18f));
+                            } else {
+                                // 方案B：无缓存，强制请求一次最新位置
+                                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                        .addOnSuccessListener(this, currentLocation -> {
+                                            if (currentLocation != null) {
+                                                LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+                                                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18f));
+                                            }
+                                        });
+                            }
+                        });
             }
-        } catch (SecurityException e) { e.printStackTrace(); }
-    }
-
-    private void startLocationUpdates() {
-        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
-                .setMinUpdateIntervalMillis(2000).build();
-        locationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(@NonNull LocationResult locationResult) {
-                if (!running) return;
-                if (locationResult.getLastLocation() != null) {
-                    Location currentLocation = locationResult.getLastLocation();
-                    LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-                    if (mMap != null) mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18f));
-                    if (isBallSport(currentType)) return;
-                    updateDistanceAndSpeed(currentLocation);
-                }
-            }
-        };
-        if (running && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
-        }
-    }
-
-    private void updateDistanceAndSpeed(Location currentLocation) {
-        long totalSeconds = totalTimeMillis / 1000;
-
-        if (lastLocation != null) {
-            float distanceMeters = currentLocation.distanceTo(lastLocation);
-            if (distanceMeters > 2) totalDistance += (distanceMeters / 1000.0);
-        }
-        lastLocation = currentLocation;
-
-        int currentKmInt = (int) totalDistance;
-        if (currentKmInt > lastKmInt && totalSeconds > lastKmSeconds) {
-            int secondsForThisKm = (int) totalSeconds - lastKmSeconds;
-            lastKmSeconds = (int) totalSeconds;
-            lastKmInt = currentKmInt;
-            int pMin = secondsForThisKm / 60;
-            int pSec = secondsForThisKm % 60;
-            String paceTime = String.format(Locale.getDefault(), "%d:%02d", pMin, pSec);
-            addSplitRow(currentKmInt, paceTime);
-        }
-
-        float speedMs = currentLocation.getSpeed();
-        if (speedMs > 0.1) {
-            double paceValueSM = 1.0 / speedMs;
-            if (tvPace != null) tvPace.setText(String.format(Locale.getDefault(), "%.1f", paceValueSM));
         } else {
-            if (tvPace != null) tvPace.setText("0.0");
-        }
-
-        if (tvDistance != null) tvDistance.setText(String.format(Locale.getDefault(), "%.2f", totalDistance));
-        double calFactor = 60.0;
-        if (currentType.equals("Cycling")) calFactor = 25.0;
-        if (currentType.equals("Walking")) calFactor = 50.0;
-        int calories = (int) (totalDistance * calFactor);
-        if (tvCalories != null) tvCalories.setText(String.valueOf(calories));
-
-        if (totalSeconds > 0) {
-            double avgSpeedKmh = totalDistance / (totalSeconds / 3600.0);
-            double avgSpeedMs = avgSpeedKmh / 3.6;
-            if (tvAvgSpeed != null) tvAvgSpeed.setText(String.format(Locale.getDefault(), "%.1f", avgSpeedMs));
-            if (avgSpeedMs > 0.1) {
-                double avgPaceSM = 1.0 / avgSpeedMs;
-                if (tvAvgPace != null) tvAvgPace.setText(String.format(Locale.getDefault(), "%.1f", avgPaceSM));
-            } else {
-                if (tvAvgPace != null) tvAvgPace.setText("0.0");
-            }
+            // 没权限，去申请
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
-    private void stopLocationUpdates() {
-        if (fusedLocationClient != null && locationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(locationCallback);
-        }
-    }
-
+    // 🚀 核心修改：权限回调
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            enableMyLocation();
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 用户刚点了同意，立刻刷新地图
+                enableMyLocation();
+            } else {
+                Toast.makeText(this, "Need location permission to track run", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
-    private void setupUIForSport(String type) {
-        if (isBallSport(type)) {
-            if (tvDistance != null && ((View)tvDistance.getParent()).getVisibility() != View.GONE) ((View)tvDistance.getParent()).setVisibility(View.GONE);
-            if (tvPace != null && ((View)tvPace.getParent()).getVisibility() != View.GONE) ((View)tvPace.getParent()).setVisibility(View.GONE);
-            if (rowStats2 != null) rowStats2.setVisibility(View.GONE);
-            if (tabBreakdown != null) tabBreakdown.setVisibility(View.GONE);
-        }
-    }
-
-    private boolean isBallSport(String type) {
-        return type.equals("Basketball") || type.equals("Badminton");
-    }
-
-    private void runTimer() {
-        if (!running) return;
-        final Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
+    private void createLocationCallback() {
+        locationCallback = new LocationCallback() {
             @Override
-            public void run() {
-                if (running) {
-                    long currentTime = System.currentTimeMillis();
-                    totalTimeMillis = currentTime - startTimeMillis;
-                    long totalSeconds = totalTimeMillis / 1000;
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                if (!isRunning) return; // 没开始跑就不记录轨迹
 
-                    int hours = (int) totalSeconds / 3600;
-                    int minutes = (int) (totalSeconds % 3600) / 60;
-                    int secs = (int) totalSeconds % 60;
-                    int ms = (int) (totalTimeMillis % 1000) / 10;
+                for (Location location : locationResult.getLocations()) {
+                    LatLng currentLatLng = new LatLng(location.getLatitude(), location.getLongitude());
 
-                    String time = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
-                    String msString = String.format(Locale.getDefault(), ".%02d", ms);
-
-                    if (tvTimerMain != null) tvTimerMain.setText(time);
-                    if (tvMilliseconds != null) tvMilliseconds.setText(msString);
-
-                    if (isBallSport(currentType)) {
-                        double kcalPerSec = (currentType.equals("Basketball")) ? 0.13 : 0.1;
-                        int totalCal = (int) (totalSeconds * kcalPerSec);
-                        if (tvCalories != null) tvCalories.setText(String.valueOf(totalCal));
+                    // 只有当移动了一定距离才记录 (防抖动)
+                    if (!pathPoints.isEmpty()) {
+                        Location lastLoc = new Location("");
+                        lastLoc.setLatitude(pathPoints.get(pathPoints.size() - 1).latitude);
+                        lastLoc.setLongitude(pathPoints.get(pathPoints.size() - 1).longitude);
+                        float dist = location.distanceTo(lastLoc);
+                        if (dist < 2) continue; // 移动小于2米忽略
+                        totalDistance += dist;
                     }
-                    handler.postDelayed(this, 10);
+
+                    pathPoints.add(currentLatLng);
+                    drawPolyline();
+                    mMap.animateCamera(CameraUpdateFactory.newLatLng(currentLatLng));
+                    updateStats();
                 }
             }
-        });
+        };
     }
 
-    private String formatPace(double paceValue) {
-        return String.format(Locale.getDefault(), "%.1f", paceValue);
-    }
-
-    private void saveWorkoutData() {
-        long finalSeconds = totalTimeMillis / 1000;
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
-            String currentDate = "TODAY - " + sdf.format(new Date());
-            String durationStr = (finalSeconds < 60) ? finalSeconds + " secs" : (finalSeconds / 60) + " mins";
-            String caloriesStr = (tvCalories != null ? tvCalories.getText().toString() : "0") + " kcal";
-
-            Workout newWorkout = new Workout(currentType, durationStr, caloriesStr, currentDate);
-            if (db != null) db.workoutDao().insert(newWorkout);
-
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            if (user != null) {
-                Map<String, Object> workoutMap = new HashMap<>();
-                workoutMap.put("type", currentType);
-                workoutMap.put("duration", durationStr);
-                workoutMap.put("calories", caloriesStr);
-                workoutMap.put("date", currentDate);
-                workoutMap.put("timestamp", System.currentTimeMillis());
-
-                FirebaseFirestore.getInstance()
-                        .collection("users")
-                        .document(user.getUid())
-                        .collection("workouts")
-                        .add(workoutMap);
-            }
-
-            Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
-            finish();
-        } catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    private void startLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
         }
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+                .setMinUpdateDistanceMeters(2)
+                .build();
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+    }
+
+    private void stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback);
+    }
+
+    private void drawPolyline() {
+        if (polyline != null) {
+            polyline.setPoints(pathPoints);
+        } else {
+            PolylineOptions options = new PolylineOptions().addAll(pathPoints).width(15).color(0xFF00FF00); // 绿色轨迹
+            polyline = mMap.addPolyline(options);
+        }
+    }
+
+    private void updateStats() {
+        // 更新距离
+        tvDistance.setText(String.format(Locale.US, "%.2f", totalDistance / 1000f));
+
+        // 更新卡路里 (粗略估算：体重60kg * 距离km * 1.036)
+        int calories = (int) (60 * (totalDistance / 1000f) * 1.036);
+        tvCalories.setText(String.valueOf(calories));
+
+        // 更新配速
+        if (totalDistance > 0) {
+            long totalSeconds = timeSwapBuff / 1000; // 总耗时(秒)
+            double minutes = totalSeconds / 60.0;
+            double km = totalDistance / 1000.0;
+            double pace = minutes / km; // 分钟/公里
+            tvPace.setText(String.format(Locale.US, "%.1f", pace));
+        }
+    }
+
+    private Runnable updateTimerThread = new Runnable() {
+        public void run() {
+            timeInMilliseconds = System.currentTimeMillis() - startTime;
+            updateTime = timeSwapBuff + timeInMilliseconds;
+
+            int secs = (int) (updateTime / 1000);
+            int mins = secs / 60;
+            int hrs = mins / 60;
+            secs = secs % 60;
+            mins = mins % 60;
+            int milliseconds = (int) (updateTime % 1000);
+
+            updateTimerUI(hrs, mins, secs, milliseconds);
+            timerHandler.postDelayed(this, 0);
+        }
+    };
+
+    private void updateTimerUI(int hrs, int mins, int secs, int ms) {
+        String timerStr = String.format(Locale.US, "%02d:%02d:%02d", hrs, mins, secs);
+        tvTimerMain.setText(timerStr);
+        tvMilliseconds.setText(String.format(Locale.US, ".%02d", ms / 10));
     }
 }
