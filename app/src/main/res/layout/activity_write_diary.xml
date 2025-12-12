@@ -19,13 +19,15 @@
 
     <EditText
         android:id="@+id/diary_input"
+        android:backgroundTint="#871E1E1E"
         android:layout_width="371dp"
         android:layout_height="300dp"
         android:layout_weight="1"
-        android:background="@android:color/white"
+        android:background="#FFFFFFFF"
         android:gravity="top|start"
         android:hint="How are you feeling today?"
         android:inputType="textMultiLine"
+        android:textColor="#FFFFFFFF"
         android:padding="15dp"
         android:textSize="16sp" />
 
