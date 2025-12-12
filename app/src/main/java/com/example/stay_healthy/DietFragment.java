@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -49,10 +48,14 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+// ⚠️ 确保你的 BuildConfig 类已生成
+// 如果报错找不到 BuildConfig，请点击菜单 Build -> Rebuild Project
+import com.example.stay_healthy.BuildConfig;
+
 public class DietFragment extends Fragment {
 
-
-    private static final String GEMINI_API_KEY = "AIzaSyCG-vTBmCNeYtwbiXeJdbTannwllwLZDCk";
+    // ✅ 修改点：从 BuildConfig 安全读取 Key，不再硬编码
+    private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
 
     // Gemini 1.5 Flash 接口地址
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY.trim();
@@ -158,8 +161,6 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
-
-
     // 1. 图片转 Base64 字符串
     private String bitmapToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -170,8 +171,10 @@ public class DietFragment extends Fragment {
 
     // 2. 发送请求给 Gemini
     private void performGeminiAnalysis(Bitmap imageBitmap) {
-        if (GEMINI_API_KEY.contains("AIzaSy") == false) {
-            // 简单的检查，如果你还没填Key
+        // 简单的检查 Key 是否存在
+        if (GEMINI_API_KEY == null || GEMINI_API_KEY.isEmpty()) {
+            runOnUi(() -> Toast.makeText(getContext(), "Error: API Key missing in local.properties", Toast.LENGTH_LONG).show());
+            return;
         }
 
         // 更新 UI 提示
@@ -185,7 +188,6 @@ public class DietFragment extends Fragment {
         String base64Image = bitmapToBase64(imageBitmap);
 
         // 构建 Gemini 专用的 JSON 请求体
-        // 我们要求它只返回 JSON 格式，不要废话
         String jsonBody = "{"
                 + "\"contents\": [{"
                 + "  \"parts\": ["
@@ -216,7 +218,7 @@ public class DietFragment extends Fragment {
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                 String responseBody = response.body().string();
-                Log.d("GEMINI", responseBody); // 在 Logcat 里打印结果方便调试
+                Log.d("GEMINI", responseBody);
 
                 if (response.isSuccessful()) {
                     try {
@@ -224,13 +226,10 @@ public class DietFragment extends Fragment {
                         GeminiResponse geminiResp = gson.fromJson(responseBody, GeminiResponse.class);
                         String rawText = geminiResp.candidates.get(0).content.parts.get(0).text;
 
-                        // 2. 清理可能存在的 markdown 符号 (以防万一)
-                        rawText = rawText.replace("```json", "").replace("```", "").trim();
-
-                        // 3. 解析我们需要的食物数据
+                        // 2. 解析我们需要的食物数据
                         AiFoodResult result = gson.fromJson(rawText, AiFoodResult.class);
 
-                        // 4. 回到主线程更新 UI
+                        // 3. 回到主线程更新 UI
                         runOnUi(() -> {
                             if (tempEtName != null) tempEtName.setText(result.foodName);
                             if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
@@ -264,10 +263,6 @@ public class DietFragment extends Fragment {
             getActivity().runOnUiThread(action);
         }
     }
-
-    // ==========================================
-    // 常规逻辑 (数据加载、弹窗等)
-    // ==========================================
 
     private void loadData() {
         if (getContext() == null) return;
