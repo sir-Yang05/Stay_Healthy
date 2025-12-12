@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
+    android:background="@color/card_dark"
     tools:context=".ProfileFragment">
 
     <!-- 1. 浮动的设置图标 - 保持不变 -->
@@ -51,6 +51,7 @@
                 android:layout_gravity="center_horizontal"
                 android:layout_marginBottom="30dp"
                 android:text="Profile"
+                android:textColor="#FFFFFF"
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
@@ -74,7 +75,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="user.email@example.com"
-                    android:textColor="@android:color/black"
+                    android:textColor="#FFFFFF"
                     android:textSize="14sp"/>
 
             </LinearLayout>
@@ -86,6 +87,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:background="#04FFDE3B"
                 android:layout_marginBottom="15dp">
 
                 <!-- 3.1. 性别 (只读 TextView) -->
@@ -100,6 +102,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Gender"
+                        android:textColor="#FFFFFF"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -110,6 +113,7 @@
                         android:gravity="center_vertical"
                         android:paddingStart="16dp"
                         android:text="Not Set"
+                        android:textColor="#FFFFFF"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -125,6 +129,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Birthday"
+                        android:textColor="#FFFFFF"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -135,6 +140,7 @@
                         android:gravity="center_vertical"
                         android:paddingStart="16dp"
                         android:text="Not Set"
+                        android:textColor="#FFFFFF"
                         android:textSize="14sp"/>
                 </LinearLayout>
 
@@ -151,6 +157,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Personal Signature"
+                    android:textColor="#FFFFFF"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -159,17 +166,19 @@
                     android:id="@+id/signature_display_text"
                     android:layout_width="match_parent"
                     android:layout_height="101dp"
-                    android:background="#E0E0E0"
+                    android:background="#04FFDE3B"
                     android:minHeight="48dp"
                     android:paddingStart="16dp"
                     android:paddingTop="8dp"
                     android:paddingBottom="8dp"
                     android:text="No signature yet."
+                    android:textColor="#FFFFFF"
                     android:textSize="14sp" />
             </LinearLayout>
 
             <!-- 移除保存和注销按钮 -->
             <View android:layout_width="match_parent" android:layout_height="80dp"/>
+
 
         </LinearLayout>
     </ScrollView>
