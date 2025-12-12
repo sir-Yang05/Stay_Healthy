@@ -1,5 +1,5 @@
 import org.gradle.kotlin.dsl.implementation
-import java.util.Properties // 👈 1. 新增：导入 Properties 类
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -19,25 +19,29 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 👇👇👇 2. 新增：读取 local.properties 的 Kotlin 写法 👇👇👇
+        // =================================================================
+        // 👇👇👇 核心修改区域：读取 local.properties 中的 Keys 👇👇👇
+        // =================================================================
         val properties = Properties()
         val localPropertiesFile = project.rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
             localPropertiesFile.inputStream().use { properties.load(it) }
         }
 
-        // 获取 Key，如果没有则为空字符串
-        val apiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
+        // 1. 读取 Gemini API Key (用于 AI 功能)
+        val geminiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
 
-        // 生成 BuildConfig 字段
-        buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
-        // 👆👆👆 新增结束 👆👆👆
+        // 2. 读取 Maps API Key (用于地图功能)
+        val mapsKey = properties.getProperty("MAPS_API_KEY") ?: ""
+        // 将地图 Key 注入到 Manifest 占位符中
+        manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+        // =================================================================
     }
 
-    // 👇👇👇 3. 新增：开启 BuildConfig 功能 👇👇👇
     buildFeatures {
         buildConfig = true
-        viewBinding = true // 如果你之前用到ViewBinding，也建议开启
+        viewBinding = true
     }
 
     buildTypes {
@@ -67,7 +71,7 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-database:20.3.1")
 
-    // AndroidX Libraries from libs.versions.toml
+    // AndroidX Libraries
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
