@@ -32,7 +32,9 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -68,7 +70,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
 
-        // 初始化控件
         tvTimerMain = findViewById(R.id.tv_timer_main);
         tvMilliseconds = findViewById(R.id.tv_milliseconds);
         tvDistance = findViewById(R.id.tv_distance);
@@ -82,10 +83,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         findViewById(R.id.btn_back_run).setOnClickListener(v -> finish());
 
-        // 初始化定位服务
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        // 初始化地图
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         if (mapFragment != null) {
@@ -108,7 +107,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         btnStop.setOnClickListener(v -> stopRun());
 
         btnReset.setOnClickListener(v -> {
-            // 重置逻辑
             pauseRun();
             resetData();
             btnReset.setVisibility(View.GONE);
@@ -143,8 +141,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 .setTitle("End Run?")
                 .setMessage("Are you sure you want to end this run?")
                 .setPositiveButton("Yes", (dialog, which) -> {
-                    saveRunData();
-                    finish();
+                    saveRunData(); // 直接保存，不废话
                 })
                 .setNegativeButton("No", null)
                 .show();
@@ -166,17 +163,56 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tvCalories.setText("0");
     }
 
+    // 🔥🔥🔥 这里的限制代码已经全部删除！0米也能保存！🔥🔥🔥
     private void saveRunData() {
-        // 这里写保存到数据库的逻辑
-        Toast.makeText(this, "Run Saved!", Toast.LENGTH_SHORT).show();
+        // 1. 准备数据
+        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        String currentDate = sdfDate.format(new Date());
+
+        SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm", Locale.US);
+        String currentTime = sdfTime.format(new Date());
+
+        // 获取界面上的数据字符串 (即使是 "0.00 km" 也会获取)
+        String durationStr = tvTimerMain.getText().toString();
+        String distanceStr = tvDistance.getText().toString() + " km";
+        String caloriesStr = tvCalories.getText().toString() + " kcal";
+        String paceStr = tvPace.getText().toString();
+
+        // 2. 开启子线程写入数据库
+        new Thread(() -> {
+            try {
+                AppDatabase db = AppDatabase.getInstance(getApplicationContext());
+
+                Workout workout = new Workout();
+                workout.type = "Running";
+                workout.date = currentDate;
+                workout.time = currentTime;
+                workout.duration = durationStr;
+                workout.distance = distanceStr;
+                workout.calories = caloriesStr;
+                workout.pace = paceStr;
+
+                db.workoutDao().insert(workout);
+
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Workout Saved!", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Error saving: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
 
-    // ---------------- 定位核心逻辑 ----------------
+    // ---------------- 定位部分 ----------------
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
-        // 尝试启用定位图层
         enableMyLocation();
     }
 
@@ -187,15 +223,12 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
 
-                // 🚀 核心修改：双重保险获取位置
                 fusedLocationClient.getLastLocation()
                         .addOnSuccessListener(this, location -> {
                             if (location != null) {
-                                // 方案A：有缓存，直接飞过去
                                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
                                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18f));
                             } else {
-                                // 方案B：无缓存，强制请求一次最新位置
                                 fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                                         .addOnSuccessListener(this, currentLocation -> {
                                             if (currentLocation != null) {
@@ -207,23 +240,20 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                         });
             }
         } else {
-            // 没权限，去申请
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                     LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
-    // 🚀 核心修改：权限回调
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // 用户刚点了同意，立刻刷新地图
                 enableMyLocation();
             } else {
-                Toast.makeText(this, "Need location permission to track run", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Location permission needed", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -232,18 +262,17 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
-                if (!isRunning) return; // 没开始跑就不记录轨迹
+                if (!isRunning) return;
 
                 for (Location location : locationResult.getLocations()) {
                     LatLng currentLatLng = new LatLng(location.getLatitude(), location.getLongitude());
 
-                    // 只有当移动了一定距离才记录 (防抖动)
                     if (!pathPoints.isEmpty()) {
                         Location lastLoc = new Location("");
                         lastLoc.setLatitude(pathPoints.get(pathPoints.size() - 1).latitude);
                         lastLoc.setLongitude(pathPoints.get(pathPoints.size() - 1).longitude);
                         float dist = location.distanceTo(lastLoc);
-                        if (dist < 2) continue; // 移动小于2米忽略
+                        if (dist < 2) continue;
                         totalDistance += dist;
                     }
 
@@ -274,26 +303,27 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         if (polyline != null) {
             polyline.setPoints(pathPoints);
         } else {
-            PolylineOptions options = new PolylineOptions().addAll(pathPoints).width(15).color(0xFF00FF00); // 绿色轨迹
+            PolylineOptions options = new PolylineOptions()
+                    .addAll(pathPoints)
+                    .width(15)
+                    .color(0xFF00FF00);
             polyline = mMap.addPolyline(options);
         }
     }
 
     private void updateStats() {
-        // 更新距离
         tvDistance.setText(String.format(Locale.US, "%.2f", totalDistance / 1000f));
-
-        // 更新卡路里 (粗略估算：体重60kg * 距离km * 1.036)
         int calories = (int) (60 * (totalDistance / 1000f) * 1.036);
         tvCalories.setText(String.valueOf(calories));
 
-        // 更新配速
         if (totalDistance > 0) {
-            long totalSeconds = timeSwapBuff / 1000; // 总耗时(秒)
+            long totalSeconds = timeSwapBuff / 1000;
             double minutes = totalSeconds / 60.0;
             double km = totalDistance / 1000.0;
-            double pace = minutes / km; // 分钟/公里
-            tvPace.setText(String.format(Locale.US, "%.1f", pace));
+            if (km > 0.001) {
+                double pace = minutes / km;
+                tvPace.setText(String.format(Locale.US, "%.1f", pace));
+            }
         }
     }
 

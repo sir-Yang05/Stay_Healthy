@@ -1,29 +1,32 @@
 package com.example.stay_healthy;
 
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
-// @Entity 表示这就是一张表，表名叫 "workout_table"
 @Entity(tableName = "workout_table")
 public class Workout {
-
-    // 每一条记录都需要一个独一无二的 ID，自动生成
     @PrimaryKey(autoGenerate = true)
     public int id;
 
-    // 我们要记录的三个核心数据
-    public String type;      // 运动类型 (Running, Cycling...)
-    public String duration;  // 时长 (30 mins)
-    public String calories;  // 卡路里 (300 kcal)
+    public String type;      // 运动类型 (例如 "Running", "Walking") <--- 新增
+    public String date;      // 日期
+    public String time;      // 时间
+    public String duration;  // 时长
+    public String distance;  // 距离
+    public String calories;  // 卡路里
+    public String pace;      // 配速
 
-    // 还可以加一个日期
-    public String date;      // 日期 (TODAY - 7:00 AM)
+    // 无参构造函数
+    public Workout() {
+    }
 
-    // 构造函数
-    public Workout(String type, String duration, String calories, String date) {
-        this.type = type;
+    // 兼容旧代码
+    @Ignore
+    public Workout(String date, String duration, String calories, String distance) {
+        this.date = date;
         this.duration = duration;
         this.calories = calories;
-        this.date = date;
+        this.distance = distance;
     }
 }
