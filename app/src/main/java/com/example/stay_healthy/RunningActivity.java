@@ -6,7 +6,9 @@ import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.transition.TransitionManager; // ✨ 1. 导入动画库
 import android.view.View;
+import android.view.ViewGroup; // ✨ 2. 导入 ViewGroup
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -63,13 +65,14 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     // 按钮
     private Button btnStartPause, btnStop, btnReset;
-    private LinearLayout layoutButtons;
+    private LinearLayout layoutButtons; // 动画容器
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
 
+        // 初始化控件
         tvTimerMain = findViewById(R.id.tv_timer_main);
         tvMilliseconds = findViewById(R.id.tv_milliseconds);
         tvDistance = findViewById(R.id.tv_distance);
@@ -83,8 +86,10 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         findViewById(R.id.btn_back_run).setOnClickListener(v -> finish());
 
+        // 初始化定位服务
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+        // 初始化地图
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         if (mapFragment != null) {
@@ -107,6 +112,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         btnStop.setOnClickListener(v -> stopRun());
 
         btnReset.setOnClickListener(v -> {
+            // ✨ 3. 丝滑动画：重置时按钮消失的动画
+            TransitionManager.beginDelayedTransition(layoutButtons);
+
             pauseRun();
             resetData();
             btnReset.setVisibility(View.GONE);
@@ -119,9 +127,14 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         isRunning = true;
         startTime = System.currentTimeMillis();
         timerHandler.postDelayed(updateTimerThread, 0);
+
+        // ✨ 4. 丝滑动画：开始时 STOP/RESET 隐藏的动画
+        TransitionManager.beginDelayedTransition(layoutButtons);
+
         btnStartPause.setText("PAUSE");
         btnStop.setVisibility(View.GONE);
         btnReset.setVisibility(View.GONE);
+
         startLocationUpdates();
     }
 
@@ -129,9 +142,14 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         isRunning = false;
         timeSwapBuff += timeInMilliseconds;
         timerHandler.removeCallbacks(updateTimerThread);
+
+        // ✨ 5. 丝滑动画：暂停时 STOP/RESET 滑出来的动画
+        TransitionManager.beginDelayedTransition(layoutButtons);
+
         btnStartPause.setText("RESUME");
         btnStop.setVisibility(View.VISIBLE);
         btnReset.setVisibility(View.VISIBLE);
+
         stopLocationUpdates();
     }
 
@@ -141,7 +159,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 .setTitle("End Run?")
                 .setMessage("Are you sure you want to end this run?")
                 .setPositiveButton("Yes", (dialog, which) -> {
-                    saveRunData(); // 直接保存，不废话
+                    saveRunData(); // 只要点了 Yes 就保存
                 })
                 .setNegativeButton("No", null)
                 .show();
@@ -163,7 +181,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tvCalories.setText("0");
     }
 
-    // 🔥🔥🔥 这里的限制代码已经全部删除！0米也能保存！🔥🔥🔥
+    // 🔥 只要点击就保存，没有任何距离限制 🔥
     private void saveRunData() {
         // 1. 准备数据
         SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -172,7 +190,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm", Locale.US);
         String currentTime = sdfTime.format(new Date());
 
-        // 获取界面上的数据字符串 (即使是 "0.00 km" 也会获取)
+        // 获取界面上的数据字符串
         String durationStr = tvTimerMain.getText().toString();
         String distanceStr = tvDistance.getText().toString() + " km";
         String caloriesStr = tvCalories.getText().toString() + " kcal";
@@ -208,7 +226,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         }).start();
     }
 
-    // ---------------- 定位部分 ----------------
+    // ---------------- 定位部分 (保持不变) ----------------
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
