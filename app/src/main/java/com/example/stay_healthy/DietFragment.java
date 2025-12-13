@@ -34,7 +34,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.gson.Gson;
-// ⚠️ 如果下面这行 BuildConfig 爆红，请先忽略，按照底部的【关键配置】步骤操作
+// ⚠️ 确保 BuildConfig 存在。如果报红，请 Build -> Rebuild Project
 import com.example.stay_healthy.BuildConfig;
 
 import java.io.ByteArrayOutputStream;
@@ -56,12 +56,11 @@ import okhttp3.Response;
 
 public class DietFragment extends Fragment {
 
-    // ✅ 安全获取 Key：从 local.properties -> BuildConfig 获取
-    // 如果这里爆红，说明你的 build.gradle 没配置好（看文末说明）
+    // ✅ 从 BuildConfig 安全读取 Key
     private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
 
-    // Gemini 接口地址
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
+    // ✅ 修正为 1.5 模型，解决 404 错误
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_API_KEY;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
@@ -78,7 +77,7 @@ public class DietFragment extends Fragment {
     private ImageView btnClearAll;
 
     // 数据变量
-    private static final int BASE_CALORIE_GOAL = 1800;
+    private static final int DEFAULT_BASE_GOAL = 1800; // 默认值
     private static final int BASE_WATER_GOAL = 2000;
     private int currentWaterMl = 0;
 
@@ -137,6 +136,9 @@ public class DietFragment extends Fragment {
         ImageView btnAddLunch = view.findViewById(R.id.btn_add_lunch);
         ImageView btnAddDinner = view.findViewById(R.id.btn_add_dinner);
 
+        // ✅ 点击卡路里目标文字，弹出修改框
+        tvCalGoalLabel.setOnClickListener(v -> showEditGoalDialog());
+
         btnAddBreakfast.setOnClickListener(v -> showAddFoodDialog("Breakfast"));
         btnAddLunch.setOnClickListener(v -> showAddFoodDialog("Lunch"));
         if (btnAddDinner != null) btnAddDinner.setOnClickListener(v -> showAddFoodDialog("Dinner"));
@@ -158,6 +160,115 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
+    // 🟢 新增：修改卡路里目标的弹窗
+    private void showEditGoalDialog() {
+        if (getContext() == null) return;
+        final EditText input = new EditText(getContext());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Set Daily Goal (e.g. 2000)");
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.LTGRAY);
+        input.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFC0FF00));
+
+        // 获取当前目标填入框中
+        SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
+        int currentGoal = prefs.getInt("user_calorie_goal", DEFAULT_BASE_GOAL);
+        input.setText(String.valueOf(currentGoal));
+
+        new AlertDialog.Builder(getContext(), R.style.DarkDialogTheme)
+                .setTitle("Set Calorie Goal")
+                .setView(input)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String text = input.getText().toString();
+                    if (!text.isEmpty()) {
+                        // 只保留数字
+                        String cleanText = text.replaceAll("[^0-9]", "");
+                        if (!cleanText.isEmpty()) {
+                            int newGoal = Integer.parseInt(cleanText);
+                            prefs.edit().putInt("user_calorie_goal", newGoal).apply();
+                            loadData(); // 刷新界面
+                            Toast.makeText(getContext(), "Goal Updated!", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void loadData() {
+        if (getContext() == null) return;
+        SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
+        currentWaterMl = prefs.getInt("water_ml", 0);
+
+        // ✅ 从缓存读取用户设置的目标，如果没设置过，就用 1800
+        int userBaseGoal = prefs.getInt("user_calorie_goal", DEFAULT_BASE_GOAL);
+
+        AppDatabase db = AppDatabase.getInstance(requireContext());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String todayDate = sdf.format(new Date());
+
+        int exerciseCalories = 0;
+        try {
+            List<Workout> workouts = db.workoutDao().getAllWorkouts();
+            for (Workout w : workouts) {
+                if (w.calories != null) {
+                    // ✅ 防崩坏：只提取数字 (防止 "200 kcal" 这种格式导致报错)
+                    String cleanCal = w.calories.replaceAll("[^0-9]", "");
+                    if (!cleanCal.isEmpty()) {
+                        exerciseCalories += Integer.parseInt(cleanCal);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // 动态目标 = 用户基础目标 + 运动消耗
+        int dynamicCalGoal = userBaseGoal + exerciseCalories;
+        int dynamicWaterGoal = BASE_WATER_GOAL + exerciseCalories;
+
+        List<Food> foods = db.foodDao().getFoodsByDate(todayDate);
+        int totalEaten = 0;
+        StringBuilder breakfastText = new StringBuilder();
+        StringBuilder lunchText = new StringBuilder();
+        StringBuilder dinnerText = new StringBuilder();
+
+        for (Food food : foods) {
+            int cal = 0;
+            try {
+                // ✅ 防崩坏
+                String cleanCal = food.calories.replaceAll("[^0-9]", "");
+                if (!cleanCal.isEmpty()) {
+                    cal = Integer.parseInt(cleanCal);
+                }
+            } catch (Exception e) {}
+            totalEaten += cal;
+
+            if ("Breakfast".equals(food.mealType)) breakfastText.append(food.name).append(" (").append(cal).append("), ");
+            else if ("Lunch".equals(food.mealType)) lunchText.append(food.name).append(" (").append(cal).append("), ");
+            else if ("Dinner".equals(food.mealType)) dinnerText.append(food.name).append(" (").append(cal).append("), ");
+        }
+
+        tvCalEaten.setText(String.valueOf(totalEaten));
+        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal"); // 显示动态目标
+        progressCal.setMax(dynamicCalGoal);
+        progressCal.setProgress(totalEaten);
+
+        if (breakfastText.length() > 0) tvBreakfastSummary.setText(breakfastText.toString());
+        else tvBreakfastSummary.setText("No food added");
+
+        if (lunchText.length() > 0) tvLunchSummary.setText(lunchText.toString());
+        else tvLunchSummary.setText("No food added");
+
+        if (tvDinnerSummary != null) {
+            if (dinnerText.length() > 0) tvDinnerSummary.setText(dinnerText.toString());
+            else tvDinnerSummary.setText("No food added");
+        }
+
+        tvWaterCount.setText(currentWaterMl + " / " + dynamicWaterGoal + " ml");
+        tvWaterRec.setText("Goal increased by " + exerciseCalories + "ml");
+    }
+
     private String bitmapToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
@@ -166,7 +277,6 @@ public class DietFragment extends Fragment {
     }
 
     private void performGeminiAnalysis(Bitmap imageBitmap) {
-        // 检查 Key 是否有效
         if (GEMINI_API_KEY == null || GEMINI_API_KEY.isEmpty() || GEMINI_API_KEY.contains("null")) {
             runOnUi(() -> Toast.makeText(getContext(), "Error: API Key missing in local.properties", Toast.LENGTH_LONG).show());
             return;
@@ -181,7 +291,6 @@ public class DietFragment extends Fragment {
 
         String base64Image = bitmapToBase64(imageBitmap);
 
-        // JSON 请求体
         String jsonBody = "{"
                 + "\"contents\": [{"
                 + "  \"parts\": ["
@@ -215,19 +324,14 @@ public class DietFragment extends Fragment {
 
                 if (response.isSuccessful()) {
                     try {
-                        // 解析 Gemini 响应
                         GeminiResponse geminiResp = gson.fromJson(responseBody, GeminiResponse.class);
                         if (geminiResp.candidates != null && !geminiResp.candidates.isEmpty()) {
                             String rawText = geminiResp.candidates.get(0).content.parts.get(0).text;
-
-                            // 清理可能的 Markdown 符号
                             rawText = rawText.replace("```json", "").replace("```", "").trim();
-
-                            // 解析食物数据
                             AiFoodResult result = gson.fromJson(rawText, AiFoodResult.class);
 
                             runOnUi(() -> {
-                                if (tempEtName != null) tempEtName.setText(result.food_name); // 注意字段名匹配
+                                if (tempEtName != null) tempEtName.setText(result.food_name);
                                 if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
                                 if (tempTvAiHint != null) {
                                     tempTvAiHint.setText("Done!");
@@ -255,64 +359,6 @@ public class DietFragment extends Fragment {
         if (getActivity() != null) {
             getActivity().runOnUiThread(action);
         }
-    }
-
-    private void loadData() {
-        if (getContext() == null) return;
-        SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
-        currentWaterMl = prefs.getInt("water_ml", 0);
-
-        AppDatabase db = AppDatabase.getInstance(requireContext());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        String todayDate = sdf.format(new Date());
-
-        int exerciseCalories = 0;
-        try {
-            List<Workout> workouts = db.workoutDao().getAllWorkouts();
-            for (Workout w : workouts) {
-                if (w.calories != null) {
-                    exerciseCalories += Integer.parseInt(w.calories.replace(" kcal", "").trim());
-                }
-            }
-        } catch (Exception e) {}
-
-        int dynamicCalGoal = BASE_CALORIE_GOAL + exerciseCalories;
-        int dynamicWaterGoal = BASE_WATER_GOAL + exerciseCalories;
-
-        List<Food> foods = db.foodDao().getFoodsByDate(todayDate);
-        int totalEaten = 0;
-        StringBuilder breakfastText = new StringBuilder();
-        StringBuilder lunchText = new StringBuilder();
-        StringBuilder dinnerText = new StringBuilder();
-
-        for (Food food : foods) {
-            int cal = 0;
-            try { cal = Integer.parseInt(food.calories); } catch (Exception e) {}
-            totalEaten += cal;
-
-            if ("Breakfast".equals(food.mealType)) breakfastText.append(food.name).append(" (").append(cal).append("), ");
-            else if ("Lunch".equals(food.mealType)) lunchText.append(food.name).append(" (").append(cal).append("), ");
-            else if ("Dinner".equals(food.mealType)) dinnerText.append(food.name).append(" (").append(cal).append("), ");
-        }
-
-        tvCalEaten.setText(String.valueOf(totalEaten));
-        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal");
-        progressCal.setMax(dynamicCalGoal);
-        progressCal.setProgress(totalEaten);
-
-        if (breakfastText.length() > 0) tvBreakfastSummary.setText(breakfastText.toString());
-        else tvBreakfastSummary.setText("No food added");
-
-        if (lunchText.length() > 0) tvLunchSummary.setText(lunchText.toString());
-        else tvLunchSummary.setText("No food added");
-
-        if (tvDinnerSummary != null) {
-            if (dinnerText.length() > 0) tvDinnerSummary.setText(dinnerText.toString());
-            else tvDinnerSummary.setText("No food added");
-        }
-
-        tvWaterCount.setText(currentWaterMl + " / " + dynamicWaterGoal + " ml");
-        tvWaterRec.setText("Goal increased by " + exerciseCalories + "ml");
     }
 
     private void showAddFoodDialog(String mealType) {
@@ -368,9 +414,15 @@ public class DietFragment extends Fragment {
                 .setView(layout)
                 .setPositiveButton("Add", (dialog, which) -> {
                     String name = tempEtName.getText().toString();
-                    String cal = tempEtCal.getText().toString();
+                    String calRaw = tempEtCal.getText().toString();
+
+                    // ✅ 这里也做了防呆：只保留数字
+                    String cal = calRaw.replaceAll("[^0-9]", "");
+
                     if (!name.isEmpty() && !cal.isEmpty()) {
                         saveFood(name, cal, mealType);
+                    } else {
+                        Toast.makeText(getContext(), "Please enter a valid number", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -475,32 +527,27 @@ public class DietFragment extends Fragment {
     }
 
     // ===========================================
-    // 👇👇👇 补充的内部类（必须加上，否则 JSON 解析会报错）
+    // JSON 解析类
     // ===========================================
 
-    // Gemini 返回的最外层
     public static class GeminiResponse {
         public List<Candidate> candidates;
     }
 
-    // 候选回答
     public static class Candidate {
         public Content content;
     }
 
-    // 内容主体
     public static class Content {
         public List<Part> parts;
     }
 
-    // 文本部分
     public static class Part {
         public String text;
     }
 
-    // 我们让 Gemini 返回的食物数据结构
     public static class AiFoodResult {
-        public String food_name; // 对应 JSON 中的 "food_name"
-        public int calories;     // 对应 JSON 中的 "calories"
+        public String food_name;
+        public int calories;
     }
 }
