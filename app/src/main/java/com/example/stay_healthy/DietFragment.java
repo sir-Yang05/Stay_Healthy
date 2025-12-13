@@ -23,6 +23,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -31,7 +32,11 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+
 import com.google.gson.Gson;
+// ⚠️ 如果下面这行 BuildConfig 爆红，请先忽略，按照底部的【关键配置】步骤操作
+import com.example.stay_healthy.BuildConfig;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -40,6 +45,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -48,19 +54,15 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-// ⚠️ 确保你的 BuildConfig 类已生成
-// 如果报错找不到 BuildConfig，请点击菜单 Build -> Rebuild Project
-import com.example.stay_healthy.BuildConfig;
-
 public class DietFragment extends Fragment {
 
-    // ✅ 修改点：从 BuildConfig 安全读取 Key，不再硬编码
+    // ✅ 安全获取 Key：从 local.properties -> BuildConfig 获取
+    // 如果这里爆红，说明你的 build.gradle 没配置好（看文末说明）
     private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
 
-    // Gemini 1.5 Flash 接口地址
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY.trim();
+    // Gemini 接口地址
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
 
-    // 网络请求工具
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -91,7 +93,6 @@ public class DietFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 初始化相机结果回调
         cameraLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -99,12 +100,11 @@ public class DietFragment extends Fragment {
                         Bundle extras = result.getData().getExtras();
                         Bitmap imageBitmap = (Bitmap) extras.get("data");
 
-                        // 如果弹窗还在，显示预览图
                         if (tempImgPreview != null) {
                             tempImgPreview.setImageBitmap(imageBitmap);
                             tempImgPreview.setVisibility(View.VISIBLE);
                         }
-                        // 📸 开始 Gemini AI 识别
+                        // 开始 AI 识别
                         performGeminiAnalysis(imageBitmap);
                     }
                 }
@@ -116,7 +116,6 @@ public class DietFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_diet, container, false);
 
-        // 绑定控件
         tvCalEaten = view.findViewById(R.id.tv_cal_eaten);
         tvCalGoalLabel = view.findViewById(R.id.tv_cal_goal_label);
         progressCal = view.findViewById(R.id.progress_calories);
@@ -138,12 +137,10 @@ public class DietFragment extends Fragment {
         ImageView btnAddLunch = view.findViewById(R.id.btn_add_lunch);
         ImageView btnAddDinner = view.findViewById(R.id.btn_add_dinner);
 
-        // 设置点击事件
         btnAddBreakfast.setOnClickListener(v -> showAddFoodDialog("Breakfast"));
         btnAddLunch.setOnClickListener(v -> showAddFoodDialog("Lunch"));
         if (btnAddDinner != null) btnAddDinner.setOnClickListener(v -> showAddFoodDialog("Dinner"));
 
-        // 点击整行管理/删除
         rowBreakfast.setOnClickListener(v -> showManageFoodDialog("Breakfast"));
         rowLunch.setOnClickListener(v -> showManageFoodDialog("Lunch"));
         if (rowDinner != null) rowDinner.setOnClickListener(v -> showManageFoodDialog("Dinner"));
@@ -161,7 +158,6 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
-    // 1. 图片转 Base64 字符串
     private String bitmapToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
@@ -169,25 +165,23 @@ public class DietFragment extends Fragment {
         return Base64.encodeToString(byteArray, Base64.NO_WRAP);
     }
 
-    // 2. 发送请求给 Gemini
     private void performGeminiAnalysis(Bitmap imageBitmap) {
-        // 简单的检查 Key 是否存在
-        if (GEMINI_API_KEY == null || GEMINI_API_KEY.isEmpty()) {
+        // 检查 Key 是否有效
+        if (GEMINI_API_KEY == null || GEMINI_API_KEY.isEmpty() || GEMINI_API_KEY.contains("null")) {
             runOnUi(() -> Toast.makeText(getContext(), "Error: API Key missing in local.properties", Toast.LENGTH_LONG).show());
             return;
         }
 
-        // 更新 UI 提示
         if (tempTvAiHint != null) {
-            tempTvAiHint.setText("Gemini AI Analyzing... Please wait.");
-            tempTvAiHint.setTextColor(0xFFC0FF00); // 荧光绿
+            tempTvAiHint.setText("Gemini AI Analyzing...");
+            tempTvAiHint.setTextColor(0xFFC0FF00);
         }
         if (tempEtName != null) tempEtName.setText("Thinking...");
         if (tempEtCal != null) tempEtCal.setText("");
 
         String base64Image = bitmapToBase64(imageBitmap);
 
-        // 构建 Gemini 专用的 JSON 请求体
+        // JSON 请求体
         String jsonBody = "{"
                 + "\"contents\": [{"
                 + "  \"parts\": ["
@@ -203,14 +197,13 @@ public class DietFragment extends Fragment {
         RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder().url(API_URL).post(body).build();
 
-        // 异步发送请求
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 e.printStackTrace();
                 runOnUi(() -> {
-                    Toast.makeText(getContext(), "Network error. Please check your network connection.", Toast.LENGTH_SHORT).show();
-                    if (tempTvAiHint != null) tempTvAiHint.setText("Connection failed");
+                    Toast.makeText(getContext(), "Network Error", Toast.LENGTH_SHORT).show();
+                    if (tempTvAiHint != null) tempTvAiHint.setText("Connection Failed");
                     if (tempEtName != null) tempEtName.setText("");
                 });
             }
@@ -222,42 +215,42 @@ public class DietFragment extends Fragment {
 
                 if (response.isSuccessful()) {
                     try {
-                        // 1. 解析 Gemini 的外层结构
+                        // 解析 Gemini 响应
                         GeminiResponse geminiResp = gson.fromJson(responseBody, GeminiResponse.class);
-                        String rawText = geminiResp.candidates.get(0).content.parts.get(0).text;
+                        if (geminiResp.candidates != null && !geminiResp.candidates.isEmpty()) {
+                            String rawText = geminiResp.candidates.get(0).content.parts.get(0).text;
 
-                        // 2. 解析我们需要的食物数据
-                        AiFoodResult result = gson.fromJson(rawText, AiFoodResult.class);
+                            // 清理可能的 Markdown 符号
+                            rawText = rawText.replace("```json", "").replace("```", "").trim();
 
-                        // 3. 回到主线程更新 UI
-                        runOnUi(() -> {
-                            if (tempEtName != null) tempEtName.setText(result.foodName);
-                            if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
-                            if (tempTvAiHint != null) {
-                                tempTvAiHint.setText("Recognition complete!");
-                                tempTvAiHint.setTextColor(Color.LTGRAY);
-                            }
-                            Toast.makeText(getContext(), "Recognition successful: " + result.foodName, Toast.LENGTH_SHORT).show();
-                        });
+                            // 解析食物数据
+                            AiFoodResult result = gson.fromJson(rawText, AiFoodResult.class);
 
+                            runOnUi(() -> {
+                                if (tempEtName != null) tempEtName.setText(result.food_name); // 注意字段名匹配
+                                if (tempEtCal != null) tempEtCal.setText(String.valueOf(result.calories));
+                                if (tempTvAiHint != null) {
+                                    tempTvAiHint.setText("Done!");
+                                    tempTvAiHint.setTextColor(Color.LTGRAY);
+                                }
+                                Toast.makeText(getContext(), "Found: " + result.food_name, Toast.LENGTH_SHORT).show();
+                            });
+                        }
                     } catch (Exception e) {
                         e.printStackTrace();
                         runOnUi(() -> {
-                            Toast.makeText(getContext(), "Parsing failed. Please try again.", Toast.LENGTH_SHORT).show();
-                            if (tempEtName != null) tempEtName.setText("Parsing error");
+                            if (tempEtName != null) tempEtName.setText("Parsing Error");
                         });
                     }
                 } else {
                     runOnUi(() -> {
                         Toast.makeText(getContext(), "API Error: " + response.code(), Toast.LENGTH_SHORT).show();
-                        if (tempTvAiHint != null) tempTvAiHint.setText("Server Error");
                     });
                 }
             }
         });
     }
 
-    // 辅助方法：切换到主线程更新 UI
     private void runOnUi(Runnable action) {
         if (getActivity() != null) {
             getActivity().runOnUiThread(action);
@@ -479,5 +472,35 @@ public class DietFragment extends Fragment {
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             cameraLauncher.launch(takePictureIntent);
         }
+    }
+
+    // ===========================================
+    // 👇👇👇 补充的内部类（必须加上，否则 JSON 解析会报错）
+    // ===========================================
+
+    // Gemini 返回的最外层
+    public static class GeminiResponse {
+        public List<Candidate> candidates;
+    }
+
+    // 候选回答
+    public static class Candidate {
+        public Content content;
+    }
+
+    // 内容主体
+    public static class Content {
+        public List<Part> parts;
+    }
+
+    // 文本部分
+    public static class Part {
+        public String text;
+    }
+
+    // 我们让 Gemini 返回的食物数据结构
+    public static class AiFoodResult {
+        public String food_name; // 对应 JSON 中的 "food_name"
+        public int calories;     // 对应 JSON 中的 "calories"
     }
 }
