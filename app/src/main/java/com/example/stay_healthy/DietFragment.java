@@ -56,10 +56,10 @@ import okhttp3.Response;
 
 public class DietFragment extends Fragment {
 
-    // ✅ 从 BuildConfig 安全读取 Key
+
     private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
 
-    // ✅ 修正为 1.5 模型，解决 404 错误
+
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
