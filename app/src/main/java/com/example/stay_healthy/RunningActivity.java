@@ -106,7 +106,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         btnStop.setOnClickListener(v -> stopRun());
 
         btnReset.setOnClickListener(v -> {
-            // ✨ 3. 丝滑动画：重置时按钮消失的动画
             TransitionManager.beginDelayedTransition(layoutButtons);
 
             pauseRun();
@@ -121,8 +120,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         isRunning = true;
         startTime = System.currentTimeMillis();
         timerHandler.postDelayed(updateTimerThread, 0);
-
-        // ✨ 4. 丝滑动画：开始时 STOP/RESET 隐藏的动画
         TransitionManager.beginDelayedTransition(layoutButtons);
 
         btnStartPause.setText("PAUSE");
