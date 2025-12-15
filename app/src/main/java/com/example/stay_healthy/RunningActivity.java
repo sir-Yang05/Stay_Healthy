@@ -50,7 +50,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private List<LatLng> pathPoints = new ArrayList<>();
     private Polyline polyline;
 
-    // 计时器相关
     private TextView tvTimerMain, tvMilliseconds;
     private Handler timerHandler = new Handler(Looper.getMainLooper());
     private long startTime = 0L;
@@ -59,20 +58,17 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private long updateTime = 0L;
     private boolean isRunning = false;
 
-    // 数据显示
     private TextView tvDistance, tvPace, tvCalories;
-    private float totalDistance = 0f; // 单位：米
+    private float totalDistance = 0f;
 
-    // 按钮
     private Button btnStartPause, btnStop, btnReset;
-    private LinearLayout layoutButtons; // 动画容器
+    private LinearLayout layoutButtons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
 
-        // 初始化控件
         tvTimerMain = findViewById(R.id.tv_timer_main);
         tvMilliseconds = findViewById(R.id.tv_milliseconds);
         tvDistance = findViewById(R.id.tv_distance);
@@ -86,10 +82,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         findViewById(R.id.btn_back_run).setOnClickListener(v -> finish());
 
-        // 初始化定位服务
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        // 初始化地图
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         if (mapFragment != null) {
@@ -143,7 +137,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         timeSwapBuff += timeInMilliseconds;
         timerHandler.removeCallbacks(updateTimerThread);
 
-        // ✨ 5. 丝滑动画：暂停时 STOP/RESET 滑出来的动画
         TransitionManager.beginDelayedTransition(layoutButtons);
 
         btnStartPause.setText("RESUME");
@@ -181,22 +174,18 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         tvCalories.setText("0");
     }
 
-    // 🔥 只要点击就保存，没有任何距离限制 🔥
     private void saveRunData() {
-        // 1. 准备数据
         SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         String currentDate = sdfDate.format(new Date());
 
         SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm", Locale.US);
         String currentTime = sdfTime.format(new Date());
 
-        // 获取界面上的数据字符串
         String durationStr = tvTimerMain.getText().toString();
         String distanceStr = tvDistance.getText().toString() + " km";
         String caloriesStr = tvCalories.getText().toString() + " kcal";
         String paceStr = tvPace.getText().toString();
 
-        // 2. 开启子线程写入数据库
         new Thread(() -> {
             try {
                 AppDatabase db = AppDatabase.getInstance(getApplicationContext());
@@ -225,8 +214,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             }
         }).start();
     }
-
-    // ---------------- 定位部分 (保持不变) ----------------
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {

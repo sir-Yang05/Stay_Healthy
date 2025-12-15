@@ -27,15 +27,12 @@ import java.util.Locale;
 
 public class HomeFragment extends Fragment {
 
-    // 默认目标
     private int dailyGoal = 500;
 
-    // UI 控件
     private LinearLayout layoutRecentWorkouts;
     private TextView tvTotalCalories;
     private TextView tvTotalDuration;
 
-    // 目标追踪控件
     private TextView tvGoalProgress;
     private ProgressBar progressLiveGoal;
     private View cardLiveGoal;
@@ -55,7 +52,6 @@ public class HomeFragment extends Fragment {
         progressLiveGoal = view.findViewById(R.id.progress_live_goal);
         cardLiveGoal = view.findViewById(R.id.card_live_tracking);
 
-        // 设置日期
         TextView tvCalendarDate = view.findViewById(R.id.tv_calendar_date);
         if (tvCalendarDate != null) {
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd", Locale.ENGLISH);
@@ -77,7 +73,6 @@ public class HomeFragment extends Fragment {
         loadDataFromDatabase();
     }
 
-    // 🟢 弹出运动选择菜单
     private void showSportSelectionDialog() {
         if (getContext() == null) return;
         final String[] sports = {"Running", "Walking", "Cycling", "Basketball", "Badminton"};
@@ -125,7 +120,6 @@ public class HomeFragment extends Fragment {
                 .show();
     }
 
-    // 🟢【新增】删除确认弹窗
     private void showDeleteConfirmation(Workout workout) {
         if (getContext() == null) return;
 
@@ -133,16 +127,14 @@ public class HomeFragment extends Fragment {
                 .setTitle("Delete Workout?")
                 .setMessage("Are you sure you want to delete this " + workout.type + " record?")
                 .setPositiveButton("Delete", (dialog, which) -> {
-                    // 确认删除
                     AppDatabase.getInstance(requireContext()).workoutDao().delete(workout);
                     Toast.makeText(getContext(), "Record Deleted", Toast.LENGTH_SHORT).show();
-                    loadDataFromDatabase(); // 刷新列表
+                    loadDataFromDatabase();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    // 🟢 加载数据并显示列表
     private void loadDataFromDatabase() {
         if (getContext() == null) return;
         AppDatabase db = AppDatabase.getInstance(requireContext());
@@ -198,7 +190,6 @@ public class HomeFragment extends Fragment {
             }
 
             if (btnDelete != null) {
-                // ✅ 修改点：调用确认弹窗，而不是直接删除
                 btnDelete.setOnClickListener(v -> showDeleteConfirmation(workout));
             }
             layoutRecentWorkouts.addView(cardView);

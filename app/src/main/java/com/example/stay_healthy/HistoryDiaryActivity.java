@@ -61,18 +61,15 @@ public class HistoryDiaryActivity extends AppCompatActivity {
         btnCancel = findViewById(R.id.btn_action_cancel);
         btnDelete = findViewById(R.id.btn_action_delete);
 
-        // 2. 初始化 Adapter
         adapter = new DiaryAdapter(this, displayedEntries);
         listView.setAdapter(adapter);
 
-        // 3. 检查登录并连接 Firebase
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
             String uid = user.getUid();
             String dbUrl = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/"; // 注意：一定要去网页复制准确的
             mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("Users").child(uid).child("Diaries");
         } else {
-            // 没登录测试用
             mDatabase = FirebaseDatabase.getInstance().getReference("DebugDiaries");
         }
 
@@ -82,15 +79,12 @@ public class HistoryDiaryActivity extends AppCompatActivity {
     }
 
     private void setupClickListeners() {
-        // 列表点击事件
         listView.setOnItemClickListener((parent, view, position, id) -> {
             DiaryEntry entry = displayedEntries.get(position);
 
             if (adapter.isMultiSelectMode()) {
-                // 如果是多选模式：点击 = 勾选/取消勾选
                 adapter.toggleSelection(entry.key);
             } else {
-                // 如果是普通模式：点击 = 查看详情
                 Intent intent = new Intent(HistoryDiaryActivity.this, DiaryDetailActivity.class);
                 intent.putExtra("content", entry.content);
                 intent.putExtra("date", entry.fullDate);
@@ -98,21 +92,16 @@ public class HistoryDiaryActivity extends AppCompatActivity {
             }
         });
 
-        // "Manage" 按钮点击
         btnManage.setOnClickListener(v -> {
-            // 开启多选模式
             adapter.setMultiSelectMode(true);
             bottomActionBar.setVisibility(View.VISIBLE);
-            btnManage.setVisibility(View.GONE); // 隐藏管理按钮
-            // 禁用筛选，防止在选择时数据变动
+            btnManage.setVisibility(View.GONE);
             spYear.setEnabled(false);
             spMonth.setEnabled(false);
         });
 
-        // "Cancel" 按钮点击
         btnCancel.setOnClickListener(v -> exitMultiSelectMode());
 
-        // "Delete" 按钮点击
         btnDelete.setOnClickListener(v -> {
             Set<String> keysToDelete = adapter.getSelectedKeys();
             if (keysToDelete.isEmpty()) {
@@ -124,7 +113,6 @@ public class HistoryDiaryActivity extends AppCompatActivity {
                     .setTitle("Delete Diaries")
                     .setMessage("Delete " + keysToDelete.size() + " items?")
                     .setPositiveButton("Delete", (dialog, which) -> {
-                        // 执行删除
                         for (String key : keysToDelete) {
                             if (key != null) {
                                 mDatabase.child(key).removeValue();
@@ -145,8 +133,6 @@ public class HistoryDiaryActivity extends AppCompatActivity {
         spYear.setEnabled(true);
         spMonth.setEnabled(true);
     }
-
-    // --- 下面是之前的加载和筛选逻辑，基本保持不变 ---
 
     private void setupMonthSpinner() {
         List<String> months = new ArrayList<>();
@@ -183,7 +169,6 @@ public class HistoryDiaryActivity extends AppCompatActivity {
                     }
                 }
 
-                // 刷新年份 Spinner
                 List<String> years = new ArrayList<>(yearSet);
                 years.remove("All");
                 Collections.sort(years, Collections.reverseOrder());
@@ -219,7 +204,6 @@ public class HistoryDiaryActivity extends AppCompatActivity {
             }
         }
         Collections.reverse(displayedEntries);
-        // 通知 Adapter 数据变了，刷新界面
         adapter.notifyDataSetChanged();
     }
 }

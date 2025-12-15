@@ -13,7 +13,6 @@ public class DiaryDetailActivity extends AppCompatActivity {
         TextView tvDate = findViewById(R.id.tv_detail_date);
         TextView tvContent = findViewById(R.id.tv_detail_content);
 
-        // 获取传过来的数据
         String date = getIntent().getStringExtra("date");
         String content = getIntent().getStringExtra("content");
 

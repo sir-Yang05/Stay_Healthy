@@ -23,7 +23,6 @@ public class MainPage extends AppCompatActivity {
                 Fragment selectedFragment = null;
                 int itemId = item.getItemId();
 
-                // ✅ 统一：全部都用 Fragment，不要用 Intent 跳转
                 if (itemId == R.id.nav_home) {
                     selectedFragment = new HomeFragment();
                 } else if (itemId == R.id.nav_diet) {
@@ -43,7 +42,6 @@ public class MainPage extends AppCompatActivity {
             }
         });
 
-        // 默认显示 Sport
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new HomeFragment())

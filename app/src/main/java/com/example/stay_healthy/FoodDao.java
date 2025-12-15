@@ -11,7 +11,6 @@ public interface FoodDao {
     @Insert
     void insert(Food food);
 
-    // 获取某某一天的所有食物记录
     @Query("SELECT * FROM food_table WHERE date = :date")
     List<Food> getFoodsByDate(String date);
 

@@ -27,7 +27,6 @@ public class MentalWellnessPage extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // 1. 这里的 layout 文件名要和你朋友的一致 (可能是 mental_wellness_page)
         View view = inflater.inflate(R.layout.mental_wellness_page, container, false);
 
         if (getActivity() != null) {
@@ -41,7 +40,6 @@ public class MentalWellnessPage extends Fragment {
     }
 
     private void initViews(View view) {
-        // ✅ 关键修复：Fragment 里必须用 view.findViewById
         tvRecentEntry = view.findViewById(R.id.latest_diary_text);
 
         View writeDiaryBtn = view.findViewById(R.id.write_diary_button);

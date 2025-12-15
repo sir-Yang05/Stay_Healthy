@@ -17,18 +17,17 @@ public class DiaryAdapter extends BaseAdapter {
 
     private Context context;
     private List<DiaryEntry> diaryList;
-    private boolean isMultiSelectMode = false; // 是否处于多选模式
-    private Set<String> selectedKeys = new HashSet<>(); // 存被选中的日记ID
+    private boolean isMultiSelectMode = false;
+    private Set<String> selectedKeys = new HashSet<>();
 
     public DiaryAdapter(Context context, List<DiaryEntry> diaryList) {
         this.context = context;
         this.diaryList = diaryList;
     }
 
-    // 开启/关闭多选模式
     public void setMultiSelectMode(boolean enable) {
         isMultiSelectMode = enable;
-        selectedKeys.clear(); // 切换模式时清空选择
+        selectedKeys.clear();
         notifyDataSetChanged();
     }
 
@@ -36,7 +35,6 @@ public class DiaryAdapter extends BaseAdapter {
         return isMultiSelectMode;
     }
 
-    // 选中或取消选中某一项
     public void toggleSelection(String key) {
         if (selectedKeys.contains(key)) {
             selectedKeys.remove(key);
@@ -46,7 +44,6 @@ public class DiaryAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
-    // 获取所有选中的ID（用于删除）
     public Set<String> getSelectedKeys() {
         return selectedKeys;
     }
@@ -81,16 +78,13 @@ public class DiaryAdapter extends BaseAdapter {
         tvDate.setText(entry.fullDate);
         tvContent.setText(entry.content);
 
-        // 核心逻辑：如果是多选模式，显示复选框；否则隐藏
         if (isMultiSelectMode) {
             checkBox.setVisibility(View.VISIBLE);
-            // 检查这个条目是否被选中
             checkBox.setChecked(selectedKeys.contains(entry.key));
         } else {
             checkBox.setVisibility(View.GONE);
         }
 
-        // 防止点击复选框本身导致冲突，我们主要靠点击整行来操作
         checkBox.setClickable(false);
 
         return convertView;
