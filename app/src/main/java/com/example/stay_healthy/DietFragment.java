@@ -56,7 +56,10 @@ import okhttp3.Response;
 
 public class DietFragment extends Fragment {
 
+    // ✅ 从 BuildConfig 安全读取 Key
     private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
+
+    // ✅ 修正为 1.5 模型，解决 404 错误
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
@@ -65,6 +68,7 @@ public class DietFragment extends Fragment {
             .build();
     private final Gson gson = new Gson();
 
+    // 界面控件
     private TextView tvCalEaten, tvCalGoalLabel;
     private ProgressBar progressCal;
     private TextView tvBreakfastSummary, tvLunchSummary, tvDinnerSummary;
@@ -72,10 +76,12 @@ public class DietFragment extends Fragment {
     private View cardWater;
     private ImageView btnClearAll;
 
+    // 数据变量
     private static final int DEFAULT_BASE_GOAL = 1800; // 默认值
     private static final int BASE_WATER_GOAL = 2000;
     private int currentWaterMl = 0;
 
+    // 相机与弹窗相关
     private ActivityResultLauncher<Intent> cameraLauncher;
     private EditText tempEtName, tempEtCal;
     private ImageView tempImgPreview;
@@ -97,6 +103,7 @@ public class DietFragment extends Fragment {
                             tempImgPreview.setImageBitmap(imageBitmap);
                             tempImgPreview.setVisibility(View.VISIBLE);
                         }
+                        // 开始 AI 识别
                         performGeminiAnalysis(imageBitmap);
                     }
                 }
@@ -129,6 +136,7 @@ public class DietFragment extends Fragment {
         ImageView btnAddLunch = view.findViewById(R.id.btn_add_lunch);
         ImageView btnAddDinner = view.findViewById(R.id.btn_add_dinner);
 
+        // ✅ 点击卡路里目标文字，弹出修改框
         tvCalGoalLabel.setOnClickListener(v -> showEditGoalDialog());
 
         btnAddBreakfast.setOnClickListener(v -> showAddFoodDialog("Breakfast"));
@@ -152,6 +160,7 @@ public class DietFragment extends Fragment {
         loadData();
     }
 
+    // 🟢 新增：修改卡路里目标的弹窗
     private void showEditGoalDialog() {
         if (getContext() == null) return;
         final EditText input = new EditText(getContext());
@@ -161,6 +170,7 @@ public class DietFragment extends Fragment {
         input.setHintTextColor(Color.LTGRAY);
         input.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFC0FF00));
 
+        // 获取当前目标填入框中
         SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
         int currentGoal = prefs.getInt("user_calorie_goal", DEFAULT_BASE_GOAL);
         input.setText(String.valueOf(currentGoal));
@@ -171,11 +181,12 @@ public class DietFragment extends Fragment {
                 .setPositiveButton("Save", (dialog, which) -> {
                     String text = input.getText().toString();
                     if (!text.isEmpty()) {
+                        // 只保留数字
                         String cleanText = text.replaceAll("[^0-9]", "");
                         if (!cleanText.isEmpty()) {
                             int newGoal = Integer.parseInt(cleanText);
                             prefs.edit().putInt("user_calorie_goal", newGoal).apply();
-                            loadData();
+                            loadData(); // 刷新界面
                             Toast.makeText(getContext(), "Goal Updated!", Toast.LENGTH_SHORT).show();
                         }
                     }
@@ -189,6 +200,7 @@ public class DietFragment extends Fragment {
         SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
         currentWaterMl = prefs.getInt("water_ml", 0);
 
+        // ✅ 从缓存读取用户设置的目标，如果没设置过，就用 1800
         int userBaseGoal = prefs.getInt("user_calorie_goal", DEFAULT_BASE_GOAL);
 
         AppDatabase db = AppDatabase.getInstance(requireContext());
@@ -200,6 +212,7 @@ public class DietFragment extends Fragment {
             List<Workout> workouts = db.workoutDao().getAllWorkouts();
             for (Workout w : workouts) {
                 if (w.calories != null) {
+                    // ✅ 防崩坏：只提取数字 (防止 "200 kcal" 这种格式导致报错)
                     String cleanCal = w.calories.replaceAll("[^0-9]", "");
                     if (!cleanCal.isEmpty()) {
                         exerciseCalories += Integer.parseInt(cleanCal);
@@ -210,6 +223,7 @@ public class DietFragment extends Fragment {
             e.printStackTrace();
         }
 
+        // 动态目标 = 用户基础目标 + 运动消耗
         int dynamicCalGoal = userBaseGoal + exerciseCalories;
         int dynamicWaterGoal = BASE_WATER_GOAL + exerciseCalories;
 
@@ -222,6 +236,7 @@ public class DietFragment extends Fragment {
         for (Food food : foods) {
             int cal = 0;
             try {
+                // ✅ 防崩坏
                 String cleanCal = food.calories.replaceAll("[^0-9]", "");
                 if (!cleanCal.isEmpty()) {
                     cal = Integer.parseInt(cleanCal);
@@ -235,7 +250,7 @@ public class DietFragment extends Fragment {
         }
 
         tvCalEaten.setText(String.valueOf(totalEaten));
-        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal");
+        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal"); // 显示动态目标
         progressCal.setMax(dynamicCalGoal);
         progressCal.setProgress(totalEaten);
 
@@ -401,6 +416,7 @@ public class DietFragment extends Fragment {
                     String name = tempEtName.getText().toString();
                     String calRaw = tempEtCal.getText().toString();
 
+                    // ✅ 这里也做了防呆：只保留数字
                     String cal = calRaw.replaceAll("[^0-9]", "");
 
                     if (!name.isEmpty() && !cal.isEmpty()) {
@@ -510,6 +526,9 @@ public class DietFragment extends Fragment {
         }
     }
 
+    // ===========================================
+    // JSON 解析类
+    // ===========================================
 
     public static class GeminiResponse {
         public List<Candidate> candidates;
