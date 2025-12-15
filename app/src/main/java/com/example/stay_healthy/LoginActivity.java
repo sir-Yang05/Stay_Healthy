@@ -106,18 +106,14 @@ public class LoginActivity extends AppCompatActivity {
         mAuth.sendPasswordResetEmail(identifier)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        // Success: Link sent. Tell the user to check their email.
                         Toast.makeText(LoginActivity.this,
                                 "Password reset link sent to " + identifier + ". Please check your email.",
                                 Toast.LENGTH_LONG).show();
 
                     } else {
-                        // Failure: Check for specific error indicating invalid account
                         if (task.getException() instanceof FirebaseAuthInvalidUserException) {
-                            // Account does not exist, show the required error message
                             Toast.makeText(LoginActivity.this, "Account not registered.", Toast.LENGTH_LONG).show();
                         } else {
-                            // Other error (e.g., network issue, rate limiting)
                             String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error sending link.";
                             Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
                         }

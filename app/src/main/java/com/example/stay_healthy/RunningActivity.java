@@ -149,7 +149,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 .setTitle("End Run?")
                 .setMessage("Are you sure you want to end this run?")
                 .setPositiveButton("Yes", (dialog, which) -> {
-                    saveRunData(); // 只要点了 Yes 就保存
+                    saveRunData();
                 })
                 .setNegativeButton("No", null)
                 .show();

@@ -33,14 +33,13 @@ public class HistoryDiaryActivity extends AppCompatActivity {
 
     private ListView listView;
     private Spinner spYear, spMonth;
-    private TextView btnManage; // 右上角按钮
-    private LinearLayout bottomActionBar; // 底部栏
+    private TextView btnManage;
+    private LinearLayout bottomActionBar;
     private Button btnCancel, btnDelete;
 
-    private List<DiaryEntry> allEntries = new ArrayList<>(); // 所有数据
-    private List<DiaryEntry> displayedEntries = new ArrayList<>(); // 当前显示的数据
+    private List<DiaryEntry> allEntries = new ArrayList<>();
+    private List<DiaryEntry> displayedEntries = new ArrayList<>();
 
-    // 使用我们需要的新 Adapter
     private DiaryAdapter adapter;
     private DatabaseReference mDatabase;
 
@@ -52,7 +51,7 @@ public class HistoryDiaryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_historydiary);
 
-        // 1. 初始化控件
+
         listView = findViewById(R.id.history_list_view);
         spYear = findViewById(R.id.spinner_year);
         spMonth = findViewById(R.id.spinner_month);
@@ -119,7 +118,7 @@ public class HistoryDiaryActivity extends AppCompatActivity {
                             }
                         }
                         Toast.makeText(this, "Deleted successfully", Toast.LENGTH_SHORT).show();
-                        exitMultiSelectMode(); // 删除完退出模式
+                        exitMultiSelectMode();
                     })
                     .setNegativeButton("Cancel", null)
                     .show();

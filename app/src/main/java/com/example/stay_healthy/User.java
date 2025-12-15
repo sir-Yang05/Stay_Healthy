@@ -7,7 +7,6 @@ public class User {
     public String gender;
     public String birthday;
 
-    // Firebase requires a no-argument constructor
     public User() {
     }
 

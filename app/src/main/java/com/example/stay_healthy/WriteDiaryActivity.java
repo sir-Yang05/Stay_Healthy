@@ -32,7 +32,7 @@ public class WriteDiaryActivity extends AppCompatActivity {
 
         if (user != null) {
             String uid = user.getUid();
-            String dbUrl = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/"; // 注意：一定要去网页复制准确的
+            String dbUrl = "https://stay-healthy-6d8ff-default-rtdb.asia-southeast1.firebasedatabase.app/";
             mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("Users").child(uid).child("Diaries");
         } else {
             Toast.makeText(this, "Alert: Not logged in! Saving to Debug Mode.", Toast.LENGTH_LONG).show();

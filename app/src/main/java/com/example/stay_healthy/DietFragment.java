@@ -74,7 +74,7 @@ public class DietFragment extends Fragment {
     private View cardWater;
     private ImageView btnClearAll;
 
-    private static final int DEFAULT_BASE_GOAL = 1800; // 默认值
+    private static final int DEFAULT_BASE_GOAL = 1800;
     private static final int BASE_WATER_GOAL = 2000;
     private int currentWaterMl = 0;
 
@@ -99,7 +99,6 @@ public class DietFragment extends Fragment {
                             tempImgPreview.setImageBitmap(imageBitmap);
                             tempImgPreview.setVisibility(View.VISIBLE);
                         }
-                        // 开始 AI 识别
                         performGeminiAnalysis(imageBitmap);
                     }
                 }
@@ -164,7 +163,6 @@ public class DietFragment extends Fragment {
         input.setHintTextColor(Color.LTGRAY);
         input.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFC0FF00));
 
-        // 获取当前目标填入框中
         SharedPreferences prefs = getActivity().getSharedPreferences("KeepHealthyPrefs", Context.MODE_PRIVATE);
         int currentGoal = prefs.getInt("user_calorie_goal", DEFAULT_BASE_GOAL);
         input.setText(String.valueOf(currentGoal));
@@ -174,13 +172,13 @@ public class DietFragment extends Fragment {
                 .setView(input)
                 .setPositiveButton("Save", (dialog, which) -> {
                     String text = input.getText().toString();
+
                     if (!text.isEmpty()) {
-                        // 只保留数字
                         String cleanText = text.replaceAll("[^0-9]", "");
                         if (!cleanText.isEmpty()) {
                             int newGoal = Integer.parseInt(cleanText);
                             prefs.edit().putInt("user_calorie_goal", newGoal).apply();
-                            loadData(); // 刷新界面
+                            loadData();
                             Toast.makeText(getContext(), "Goal Updated!", Toast.LENGTH_SHORT).show();
                         }
                     }
@@ -240,7 +238,7 @@ public class DietFragment extends Fragment {
         }
 
         tvCalEaten.setText(String.valueOf(totalEaten));
-        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal"); // 显示动态目标
+        tvCalGoalLabel.setText("/ " + dynamicCalGoal + " kcal");
         progressCal.setMax(dynamicCalGoal);
         progressCal.setProgress(totalEaten);
 
@@ -514,9 +512,6 @@ public class DietFragment extends Fragment {
         }
     }
 
-    // ===========================================
-    // JSON
-    // ===========================================
 
     public static class GeminiResponse {
         public List<Candidate> candidates;

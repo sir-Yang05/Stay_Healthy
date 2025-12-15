@@ -28,9 +28,9 @@ public class MainPage extends AppCompatActivity {
                 } else if (itemId == R.id.nav_diet) {
                     selectedFragment = new DietFragment();
                 } else if (itemId == R.id.nav_mental) {
-                    selectedFragment = new MentalWellnessPage(); // 确保你有这个文件
+                    selectedFragment = new MentalWellnessPage();
                 } else if (itemId == R.id.nav_profile) {
-                    selectedFragment = new ProfileFragment(); // 确保你有这个文件
+                    selectedFragment = new ProfileFragment();
                 }
 
                 if (selectedFragment != null) {
